@@ -5,12 +5,18 @@ export interface ColumnError {
   column: string;
 }
 
+export interface CellErrorDetail {
+  row: number; // 1-based row number in the data (after skipped rows)
+  value: string;
+}
+
 export interface CellError {
   column: string;
   rule: CellRule;
   ruleLabel: string;
   failCount: number;
   totalCount: number;
+  details: CellErrorDetail[];
 }
 
 export interface ValidationResult {
@@ -66,22 +72,24 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     const validator = VALIDATORS[rule];
     let failCount = 0;
     let totalCount = 0;
+    const details: CellErrorDetail[] = [];
 
-    for (const row of rows) {
-      const cellVal = String(row[colIdx] ?? '').trim();
-      if (cellVal === '') continue; // skip empty
+    for (let i = 0; i < rows.length; i++) {
+      const cellVal = String(rows[i][colIdx] ?? '').trim();
+      if (cellVal === '') continue;
       totalCount++;
       if (!validator.test(cellVal)) {
         failCount++;
+        details.push({ row: i + 2 + config.skipRows, value: cellVal });
       }
     }
 
     if (failCount > 0) {
-      cellErrors.push({ column: colName, rule, ruleLabel: validator.label, failCount, totalCount });
+      cellErrors.push({ column: colName, rule, ruleLabel: validator.label, failCount, totalCount, details });
     }
   }
 
-  // Address conditional validation (Clientes e Fornecedores)
+  // Address conditional validation
   if (config.addressColumns) {
     const addrIndices = config.addressColumns.map(c => ({ name: c, idx: headerRow.indexOf(c) }));
     const existingAddr = addrIndices.filter(a => a.idx !== -1);
@@ -94,13 +102,14 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
           for (const addr of existingAddr) {
             const val = String(row[addr.idx] ?? '').trim();
             if (val === '') {
-              // Find or create a cell error for this address column
-              let existing = cellErrors.find(e => e.column === `${addr.name} (morada incompleta)`);
+              const errorKey = `${addr.name} (morada incompleta)`;
+              let existing = cellErrors.find(e => e.column === errorKey);
               if (!existing) {
-                existing = { column: `${addr.name} (morada incompleta)`, rule: 'numbers', ruleLabel: 'Morada obrigatória quando parcialmente preenchida', failCount: 0, totalCount: rows.length };
+                existing = { column: errorKey, rule: 'numbers', ruleLabel: 'Morada obrigatória quando parcialmente preenchida', failCount: 0, totalCount: rows.length, details: [] };
                 cellErrors.push(existing);
               }
               existing.failCount++;
+              existing.details.push({ row: i + 2 + config.skipRows, value: '(vazio)' });
             }
           }
         }

@@ -1,11 +1,77 @@
-import { useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { AlertTriangle, CheckCircle2, XCircle, Columns3, Grid3X3 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, CheckCircle2, XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import type { ValidationResult } from '@/lib/validateFile';
+import type { ValidationResult, CellError } from '@/lib/validateFile';
 
 interface Props {
   result: ValidationResult;
+}
+
+function CellErrorCard({ error }: { error: CellError }) {
+  const [expanded, setExpanded] = useState(false);
+  const maxPreview = 50;
+  const hasMore = error.details.length > maxPreview;
+
+  return (
+    <div className="rounded-xl bg-card shadow-soft overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 p-3 text-left hover:bg-muted/50 transition-colors"
+      >
+        <span className="font-semibold text-foreground">{error.column}</span>
+        <span className="text-xs text-muted-foreground">Formato: {error.ruleLabel}</span>
+        <span className="error-badge sm:ml-auto shrink-0">
+          {error.failCount} célula{error.failCount > 1 ? 's' : ''} com erro
+        </span>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-border px-3 py-2 max-h-64 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-muted-foreground text-xs border-b border-border">
+                    <th className="text-left py-1.5 pr-4 font-medium">Linha</th>
+                    <th className="text-left py-1.5 font-medium">Valor encontrado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {error.details.slice(0, expanded ? maxPreview : 5).map((d, i) => (
+                    <tr key={i} className="border-b border-border/50 last:border-0">
+                      <td className="py-1.5 pr-4 font-mono text-xs text-muted-foreground">{d.row}</td>
+                      <td className="py-1.5">
+                        <code className="rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive font-mono">
+                          {d.value}
+                        </code>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {hasMore && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  A mostrar {maxPreview} de {error.details.length} erros
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export default function ValidationResults({ result }: Props) {
@@ -81,7 +147,7 @@ export default function ValidationResults({ result }: Props) {
             <Grid3X3 className="h-5 w-5" />
             Erros nas Células
           </div>
-          <p className="text-sm text-muted-foreground">Algumas células não seguem o formato esperado:</p>
+          <p className="text-sm text-muted-foreground">Clica em cada erro para ver os detalhes (linha e valor):</p>
           <div className="space-y-2">
             {result.cellErrors.map((e, i) => (
               <motion.div
@@ -89,13 +155,8 @@ export default function ValidationResults({ result }: Props) {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 rounded-xl bg-card p-3 shadow-soft"
               >
-                <span className="font-semibold text-foreground">{e.column}</span>
-                <span className="text-xs text-muted-foreground">Formato: {e.ruleLabel}</span>
-                <span className="error-badge ml-auto">
-                  {e.failCount} célula{e.failCount > 1 ? 's' : ''} com erro
-                </span>
+                <CellErrorCard error={e} />
               </motion.div>
             ))}
           </div>
