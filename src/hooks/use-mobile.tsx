@@ -1,3 +1,4 @@
+// Hook que indica se a largura da janela está abaixo do breakpoint mobile.
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;

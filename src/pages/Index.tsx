@@ -1,3 +1,4 @@
+// Página inicial: permite escolher o tipo de ficheiro, enviar a planilha e exibir o resultado da validação.
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

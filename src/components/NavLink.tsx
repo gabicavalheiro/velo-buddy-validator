@@ -1,3 +1,4 @@
+// Wrapper para NavLink do react-router que adiciona suporte a classes de estado ativo e pendente.
 import { NavLink as RouterNavLink, NavLinkProps } from "react-router-dom";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";

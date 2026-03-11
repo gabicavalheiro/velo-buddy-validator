@@ -1,4 +1,3 @@
-# Bem-vindo ao seu projeto Lovable
 
 ## Informações do projeto
 
@@ -8,19 +7,8 @@
 
 Existem várias maneiras de editar sua aplicação.
 
-**Usar o Lovable**
 
-Simplesmente acesse o [Projeto no Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) e comece a enviar prompts.
 
-As mudanças feitas pelo Lovable serão automaticamente commitadas neste repositório.
-
-**Usar sua IDE preferida**
-
-Se você quiser trabalhar localmente usando sua própria IDE, você pode clonar este repositório e enviar (`push`) as alterações. As alterações enviadas também serão refletidas no Lovable.
-
-O único requisito é ter Node.js e npm instalados – [instale com nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-Siga estes passos:
 
 ```sh
 # Passo 1: Clone o repositório usando a URL Git do projeto.
@@ -60,14 +48,4 @@ Este projeto foi construído com:
 - shadcn-ui
 - Tailwind CSS
 
-## Como posso fazer o deploy deste projeto?
 
-Simplesmente abra o [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) e clique em Share -> Publish.
-
-## Posso conectar um domínio personalizado ao meu projeto Lovable?
-
-Sim, você pode!
-
-Para conectar um domínio, acesse Project > Settings > Domains e clique em Connect Domain.
-
-Leia mais aqui: [Configurando um domínio personalizado](https://docs.lovable.dev/features/custom-domain#custom-domain)

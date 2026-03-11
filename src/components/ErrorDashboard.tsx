@@ -1,3 +1,4 @@
+// Dashboard que mostra o resumo da análise e lista detalhadamente colunas em falta e erros de células na planilha.
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, MapPin } from 'lucide-react';
@@ -72,7 +73,9 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
                         </code>
                       </td>
                       <td className="py-2 text-xs text-muted-foreground">
-                        Não corresponde a "{error.ruleLabel}"
+                        {error.ruleLabel === 'Número armazenado como texto no Excel'
+                          ? 'Erro causado por número armazenado como texto no Excel'
+                          : `Não corresponde a "${error.ruleLabel}"`}
                       </td>
                     </tr>
                   ))}
@@ -115,6 +118,7 @@ export default function ErrorDashboard({ result, fileName }: Props) {
   }
 
   const totalCellErrors = result.cellErrors.reduce((sum, e) => sum + e.failCount, 0);
+  const hasAddressErrors = result.cellErrors.some((e) => e.column.endsWith('(morada incompleta)'));
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -144,7 +148,7 @@ export default function ErrorDashboard({ result, fileName }: Props) {
             <h3 className="font-bold font-heading text-foreground">Colunas em falta ({result.columnErrors.length})</h3>
           </div>
           <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
-            <p className="text-sm text-muted-foreground mb-3">Estas colunas obrigatórias não foram encontradas no ficheiro:</p>
+            <p className="text-sm text-muted-foreground mb-1">Estas colunas obrigatórias não foram encontradas no ficheiro:</p>
             <div className="flex flex-wrap gap-2">
               {result.columnErrors.map((e, i) => (
                 <motion.div
@@ -159,6 +163,21 @@ export default function ErrorDashboard({ result, fileName }: Props) {
                 </motion.div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address rule info */}
+      {hasAddressErrors && (
+        <div className="rounded-xl bg-warning/5 border border-warning/30 p-4 flex gap-3 items-start">
+          <AlertTriangle className="h-5 w-5" style={{ color: 'hsl(var(--warning))' }} />
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold text-foreground">Regra especial para endereço</h4>
+            <p className="text-xs text-muted-foreground">
+              Nos ficheiros de clientes, os campos de endereço (CEP, Logradouro, Número, Complemento, Bairro,
+              Referência, Cidade e Estado) não são obrigatórios se todos estiverem vazios. Mas, se preencher
+              qualquer um deles numa linha, os restantes também precisam ser preenchidos para essa mesma linha.
+            </p>
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+// Hook de conveniência para disparar e gerir toasts (notificações rápidas) na interface.
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
