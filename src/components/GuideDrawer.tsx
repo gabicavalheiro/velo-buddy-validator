@@ -5,25 +5,43 @@ import {
   AlertTriangle, CheckCircle2, Info, ChevronDown, ChevronUp, Lightbulb,
 } from 'lucide-react';
 
-interface Section {
+interface GuideItem {
+  label?: string;
+  text: string;
+  warning?: boolean;
+}
+
+interface GuideSection {
   id: string;
   icon: React.ReactNode;
   color: string;
   title: string;
-  items: { label?: string; text: string; warning?: boolean }[];
+  items: GuideItem[];
 }
 
-const SECTIONS: Section[] = [
+const SECTIONS: GuideSection[] = [
   {
     id: 'clientes',
     icon: <Users className="h-4 w-4" />,
     color: 'hsl(270 60% 38%)',
     title: 'Clientes e Fornecedores',
     items: [
-      { label: 'Obrigatórios', text: 'Código, Nome/Razão Social, I.E, Simples Nacional, Cliente (1=Sim, 0=Não) e Fornecedor (1=Sim, 0=Não).' },
-      { label: 'Endereço', text: 'Se preencher qualquer dado de endereço, todos os outros campos se tornam obrigatórios: CEP, Logradouro, Número, Complemento, Bairro, Referência, Cidade e Estado.' },
-      { label: 'Fornecedor', text: 'Se for fornecedor, é obrigatório preencher o tipo: Forn. de Produto, Serviço e Transporte.' },
-      { label: 'Formatação', text: 'Textos sem caracteres especiais. Datas sempre no padrão AAAA-MM-DD.' },
+      {
+        label: 'Obrigatórios',
+        text: 'Código, Nome/Razão Social, I.E, Simples Nacional, Cliente (1=Sim, 0=Não) e Fornecedor (1=Sim, 0=Não).',
+      },
+      {
+        label: 'Endereço',
+        text: 'Se preencher qualquer dado de endereço, todos os outros campos se tornam obrigatórios: CEP, Logradouro, Número, Complemento, Bairro, Referência, Cidade e Estado.',
+      },
+      {
+        label: 'Fornecedor',
+        text: 'Se for fornecedor, é obrigatório preencher o tipo: Forn. de Produto, Serviço e Transporte.',
+      },
+      {
+        label: 'Formatação',
+        text: 'Textos sem caracteres especiais. Datas sempre no padrão AAAA-MM-DD.',
+      },
     ],
   },
   {
@@ -32,9 +50,18 @@ const SECTIONS: Section[] = [
     color: 'hsl(18 90% 52%)',
     title: 'Produto Simples',
     items: [
-      { label: 'Obrigatórios', text: 'Código (apenas números, até 11 dígitos), Descrição do Produto, Preço de Venda e Ativo (1=Sim, 0=Não).' },
-      { label: 'Preços', text: 'Formatação "Moeda" com limite de 10 caracteres e 2 decimais. Não digite "R$" manualmente.' },
-      { label: 'Tributação', text: 'Se informar o código tributário, deixe as colunas CSOSN e Origem em branco.' },
+      {
+        label: 'Obrigatórios',
+        text: 'Código (apenas números, até 11 dígitos), Descrição do Produto, Preço de Venda e Ativo (1=Sim, 0=Não).',
+      },
+      {
+        label: 'Preços',
+        text: 'Formatação "Moeda" com limite de 10 caracteres e 2 decimais. Não digite "R$" manualmente.',
+      },
+      {
+        label: 'Tributação',
+        text: 'Se informar o código tributário, deixe as colunas CSOSN e Origem em branco.',
+      },
     ],
   },
   {
@@ -43,9 +70,18 @@ const SECTIONS: Section[] = [
     color: 'hsl(200 80% 42%)',
     title: 'Produtos de Grade',
     items: [
-      { label: 'Obrigatórios', text: 'ProdutoId e EmpresaId — ambos precisam já estar cadastrados no sistema Velo.' },
-      { label: 'Grades', text: 'Se preencher "TipoColuna" (ex: Cor), a coluna "Coluna" (ex: Azul) é obrigatória. O mesmo vale para "TipoLinha" e "Linha" (ex: Tamanho / M).' },
-      { label: 'Valores e Estoque', text: 'Use vírgula para separar as casas decimais. Formate os preços como "Moeda".' },
+      {
+        label: 'Obrigatórios',
+        text: 'ProdutoId e EmpresaId — ambos precisam já estar cadastrados no sistema Velo.',
+      },
+      {
+        label: 'Grades',
+        text: 'Se preencher "TipoColuna" (ex: Cor), a coluna "Coluna" (ex: Azul) é obrigatória. O mesmo vale para "TipoLinha" e "Linha" (ex: Tamanho / M).',
+      },
+      {
+        label: 'Valores e Estoque',
+        text: 'Use vírgula para separar as casas decimais. Formate os preços como "Moeda".',
+      },
     ],
   },
   {
@@ -54,10 +90,22 @@ const SECTIONS: Section[] = [
     color: 'hsl(340 70% 44%)',
     title: 'Contas a Pagar',
     items: [
-      { label: 'Obrigatórios', text: 'Código da Pessoa e Código da Empresa — precisam existir previamente no Velo.' },
-      { label: 'Valores', text: 'Formatação "Moeda" com até 2 casas decimais separadas por vírgula.' },
-      { label: 'Datas', text: 'Padrão AAAA-MM-DD para emissão e vencimento.' },
-      { text: 'Reimportar apaga todas as contas importadas anteriormente e as registradas no PDV.', warning: true },
+      {
+        label: 'Obrigatórios',
+        text: 'Código da Pessoa e Código da Empresa — precisam existir previamente no Velo.',
+      },
+      {
+        label: 'Valores',
+        text: 'Formatação "Moeda" com até 2 casas decimais separadas por vírgula.',
+      },
+      {
+        label: 'Datas',
+        text: 'Padrão AAAA-MM-DD para emissão e vencimento.',
+      },
+      {
+        warning: true,
+        text: 'Reimportar apaga todas as contas importadas anteriormente e as registradas no PDV.',
+      },
     ],
   },
   {
@@ -66,20 +114,29 @@ const SECTIONS: Section[] = [
     color: 'hsl(145 55% 38%)',
     title: 'Contas a Receber',
     items: [
-      { label: 'Obrigatórios', text: 'Código da Pessoa, Código da Empresa e Valor em Aberto.' },
-      { label: 'Juros e Multas', text: 'Apenas números. Para tolerância de atraso, informe os dias (ex: 3). Para multas, informe a porcentagem com vírgula nas casas decimais.' },
-      { text: 'Uma nova importação substituirá todos os dados antigos do sistema.', warning: true },
+      {
+        label: 'Obrigatórios',
+        text: 'Código da Pessoa, Código da Empresa e Valor em Aberto.',
+      },
+      {
+        label: 'Juros e Multas',
+        text: 'Apenas números. Para tolerância de atraso, informe os dias (ex: 3). Para multas, informe a porcentagem com vírgula nas casas decimais.',
+      },
+      {
+        warning: true,
+        text: 'Uma nova importação substituirá todos os dados antigos do sistema.',
+      },
     ],
   },
 ];
 
-interface GuideDrawerProps {
-  open: boolean;
-  onClose: () => void;
+interface SectionCardProps {
+  section: GuideSection;
 }
 
-function SectionCard({ section }: { section: Section }) {
+function SectionCard({ section }: SectionCardProps) {
   const [expanded, setExpanded] = useState(false);
+
   return (
     <div className="rounded-xl border border-border overflow-hidden bg-card">
       <button
@@ -123,7 +180,9 @@ function SectionCard({ section }: { section: Section }) {
                   <div key={i} className="flex gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground/50" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      {item.label && <strong className="text-foreground">{item.label}: </strong>}
+                      {item.label && (
+                        <strong className="text-foreground">{item.label}: </strong>
+                      )}
                       {item.text}
                     </p>
                   </div>
@@ -137,12 +196,16 @@ function SectionCard({ section }: { section: Section }) {
   );
 }
 
+interface GuideDrawerProps {
+  open: boolean;
+  onClose: () => void;
+}
+
 export default function GuideDrawer({ open, onClose }: GuideDrawerProps) {
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             key="backdrop"
             initial={{ opacity: 0 }}
@@ -152,7 +215,6 @@ export default function GuideDrawer({ open, onClose }: GuideDrawerProps) {
             onClick={onClose}
           />
 
-          {/* Drawer — desliza da direita */}
           <motion.div
             key="drawer"
             initial={{ x: '100%' }}
@@ -183,7 +245,7 @@ export default function GuideDrawer({ open, onClose }: GuideDrawerProps) {
               </button>
             </div>
 
-            {/* Tip geral */}
+            {/* Dica geral */}
             <div className="px-4 py-3 shrink-0 border-b border-border">
               <div
                 className="rounded-xl px-3 py-2.5 flex gap-2.5"
@@ -196,10 +258,10 @@ export default function GuideDrawer({ open, onClose }: GuideDrawerProps) {
               </div>
             </div>
 
-            {/* Sections — scrollável */}
+            {/* Seções — scrollável */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2.5">
-              {SECTIONS.map((s) => (
-                <SectionCard key={s.id} section={s} />
+              {SECTIONS.map((section) => (
+                <SectionCard key={section.id} section={section} />
               ))}
             </div>
 

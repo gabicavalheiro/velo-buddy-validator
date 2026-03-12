@@ -9,7 +9,6 @@ import { parseFile, validateWorkbook, type ValidationResult } from '@/lib/valida
 import { Loader2, Upload, LayoutDashboard, CheckCircle2, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import logoVelo from '@/assets/logo-velo.png';
-import logoCirculo from '@/assets/logo-circulo.png';
 import GuideDrawer from '@/components/GuideDrawer.tsx';
 
 const Index = () => {
@@ -56,18 +55,9 @@ const Index = () => {
     <>
     <div className="min-h-screen min-h-dvh flex flex-col md:flex-row">
 
-      {/* Faixa lateral — só desktop */}
-      <div
-        className="hidden md:flex w-48 lg:w-56 shrink-0 flex-col items-center justify-center overflow-hidden relative"
-        style={{ background: 'linear-gradient(160deg, hsl(300 60% 20%) 0%, hsl(340 55% 30%) 100%)' }}
-      >
-        <img
-          src={logoCirculo}
-          alt=""
-          className="absolute -right-16 w-64 lg:w-72 opacity-80 select-none pointer-events-none"
-          style={{ top: '50%', transform: 'translateY(-50%)' }}
-        />
-      </div>
+   
+        
+
 
       {/* Faixa topo — só mobile */}
       <div

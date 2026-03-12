@@ -100,6 +100,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     label: 'Contas a Pagar',
     skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor'],
+    requiredValueColumns: ['Código da Pessoa', 'Código da Empresa'],
     cellRules: {
       'Código da Pessoa':   'numbers',
       'Código da Empresa':  'numbers',
@@ -127,7 +128,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     label: 'Contas a Receber',
     skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor em Aberto'],
-    requiredValueColumns: ['Código da Pessoa'],
+    requiredValueColumns: ['Código da Pessoa', 'Código da Empresa'],
     cellRules: {
       'Código da Pessoa':  'numbers',
       'Código da Empresa': 'numbers',

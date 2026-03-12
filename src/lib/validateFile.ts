@@ -262,32 +262,45 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       }
 
       // Número armazenado como texto (triângulo verde no Excel)
-      // Regras afetadas: 'numbers', 'currency', 'juros'
       //
-      // 'numbers' / 'currency': se rawVal é string, o Excel marcou com triângulo verde.
+      // EXCEÇÃO — leadingZeroColumns (CPF/CNPJ, IE, CEST):
+      //   Se o valor está como string, os zeros à esquerda estão PRESERVADOS — isso é correto.
+      //   NÃO flageia como "número como texto": o conselho "mudar para Número/Geral" destruiria os zeros.
+      //   Deixa validar normalmente: "04652781407" como string passa no validator 'numbers'.
       //
-      // 'juros': com formato GERAL no Excel brasileiro, digitar "10,5" salva como número 10.5
-      //   → typeof rawVal === 'number' → o validador já aceita → sem erro.
-      //   Se rawVal é string para 'juros', significa que a célula está formatada como Texto
-      //   ou que o valor tem vírgula e o Excel não reconheceu como número (ex: "10,50" como texto).
-      //   Nesse caso, o validador aceita diretamente → não é erro de formatação.
-      //   Só flag "número como texto" se for uma string puramente numérica sem vírgula (ex: "10")
-      //   o que indica que o valor foi digitado como texto sem estar no formato esperado.
+      // 'numbers': string sem ser leadingZero = triângulo verde → precisa ser número
+      // 'currency': string = triângulo verde → precisa ser número
+      // 'juros': string com vírgula ("10,50") = formato correto → valida normalmente
+      //          string sem vírgula ("10", "10.5") = armazenado como texto → flag
       if (typeof rawVal === 'string') {
-        if (rule === 'numbers' || rule === 'currency') {
-          // Qualquer string nessas colunas = triângulo verde
+        if (rule === 'numbers') {
+          if (isLeadingZeroSensitive) {
+            // Zeros preservados como texto — valida conteúdo normalmente, não é erro de formatação
+            if (!validator.test(cellVal)) {
+              failCount++;
+              details.push({ row: i + 2 + config.skipRows, value: cellVal });
+            }
+            continue;
+          }
+          // Coluna numérica normal como string = triângulo verde
+          textFailCount++;
+          textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
+          continue;
+        }
+        if (rule === 'currency') {
+          // Currency como string = triângulo verde
           textFailCount++;
           textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
           continue;
         }
         if (rule === 'juros') {
-          // Só flag se for número puro sem vírgula (ex: "10", "10.5") — armazenado como texto
-          // String com vírgula ("10,50") é o formato correto e passa na validação normal
+          // Sem vírgula = número puro armazenado como texto
           if (/^\d+(\.\d+)?$/.test(cellVal)) {
             textFailCount++;
             textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
             continue;
           }
+          // Com vírgula ("10,50") = formato correto, valida normalmente
         }
       }
 
