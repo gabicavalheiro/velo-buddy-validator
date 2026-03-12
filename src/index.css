@@ -6,42 +6,30 @@
 
 @layer base {
   :root {
-    --background: 40 33% 98%;
-    --foreground: 220 20% 20%;
-
+    --background: 220 20% 96%;
+    --foreground: 270 30% 18%;
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 20%;
-
+    --card-foreground: 270 30% 18%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 20%;
-
-    --primary: 162 48% 42%;
+    --popover-foreground: 270 30% 18%;
+    --primary: 270 60% 38%;
     --primary-foreground: 0 0% 100%;
-
-    --secondary: 30 60% 95%;
-    --secondary-foreground: 30 40% 30%;
-
-    --muted: 40 20% 94%;
+    --secondary: 270 20% 94%;
+    --secondary-foreground: 270 30% 25%;
+    --muted: 220 15% 92%;
     --muted-foreground: 220 10% 50%;
-
-    --accent: 30 80% 55%;
+    --accent: 18 90% 52%;
     --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 65% 55%;
+    --destructive: 0 65% 52%;
     --destructive-foreground: 0 0% 100%;
-
-    --success: 145 55% 45%;
+    --success: 145 55% 42%;
     --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 55%;
+    --warning: 38 92% 52%;
     --warning-foreground: 38 80% 15%;
-
-    --border: 30 20% 88%;
-    --input: 30 20% 88%;
-    --ring: 162 48% 42%;
-
+    --border: 270 15% 88%;
+    --input: 270 15% 91%;
+    --ring: 270 60% 38%;
     --radius: 1rem;
-
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -49,72 +37,35 @@
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-
+    --sidebar-ring: 270 60% 38%;
     --font-heading: 'Quicksand', sans-serif;
     --font-body: 'Nunito', sans-serif;
-
-    --shadow-soft: 0 4px 20px -4px hsl(220 20% 20% / 0.08);
-    --shadow-card: 0 8px 30px -8px hsl(220 20% 20% / 0.1);
-    --shadow-glow: 0 0 40px -10px hsl(162 48% 42% / 0.2);
+    --shadow-soft: 0 4px 20px -4px hsl(270 40% 20% / 0.10);
+    --shadow-card: 0 8px 30px -8px hsl(270 40% 20% / 0.13);
+    --shadow-glow: 0 0 40px -10px hsl(270 60% 38% / 0.25);
   }
 
-  .dark {
-    --background: 220 20% 10%;
-    --foreground: 40 20% 94%;
-    --card: 220 20% 14%;
-    --card-foreground: 40 20% 94%;
-    --popover: 220 20% 14%;
-    --popover-foreground: 40 20% 94%;
-    --primary: 162 48% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 15% 20%;
-    --secondary-foreground: 40 20% 90%;
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 60%;
-    --accent: 30 80% 55%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 22%;
-    --input: 220 15% 22%;
-    --ring: 162 48% 50%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-body);
+    @apply bg-background text-foreground font-body;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-heading);
-  }
+  h1, h2, h3, h4 { @apply font-heading; }
 }
 
 @layer components {
   .drop-zone {
-    @apply relative rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-10 text-center transition-all duration-300 cursor-pointer;
+    @apply relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary/30 bg-card p-6 sm:p-10 cursor-pointer transition-all duration-200 shadow-soft w-full;
+    min-height: 160px;
   }
-
-  .drop-zone:hover,
-  .drop-zone.drag-over {
-    @apply border-primary/60 bg-primary/10;
+  .drop-zone:hover, .drop-zone.drag-over {
+    @apply border-primary/70 bg-primary/5;
     box-shadow: var(--shadow-glow);
   }
-
   .error-badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium bg-destructive/10 text-destructive;
-  }
-
-  .success-badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium;
-    background: hsl(var(--success) / 0.1);
-    color: hsl(var(--success));
+    @apply inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-inset ring-destructive/20 whitespace-nowrap;
   }
 }

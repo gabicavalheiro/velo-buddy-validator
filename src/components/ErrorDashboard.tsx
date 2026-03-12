@@ -1,8 +1,9 @@
-// Dashboard que mostra o resumo da análise e lista detalhadamente colunas em falta e erros de células na planilha.
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, MapPin } from 'lucide-react';
+import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
+import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL } from '@/lib/validateFile';
+import HelpModal from './HelpModal';
 
 interface Props {
   result: ValidationResult | null;
@@ -11,95 +12,127 @@ interface Props {
 
 function CellErrorRow({ error, index }: { error: CellError; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const maxPreview = 100;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03 }}
-      className="rounded-xl bg-card shadow-soft overflow-hidden border border-border"
-    >
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
-      >
-        <div className="h-9 w-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-          <Hash className="h-4 w-4" style={{ color: 'hsl(var(--warning))' }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground text-sm truncate">{error.column}</p>
-          <p className="text-xs text-muted-foreground">Formato esperado: {error.ruleLabel}</p>
-        </div>
-        <span className="error-badge shrink-0">
-          {error.failCount} erro{error.failCount > 1 ? 's' : ''}
-        </span>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-        )}
-      </button>
+  const isNumberAsText = error.ruleLabel === NUMBER_AS_TEXT_LABEL;
+  const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
+  const showHelp = isNumberAsText || isLeadingZero;
 
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-border px-4 py-3 max-h-72 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground text-xs">
-                    <th className="text-left py-2 pr-6 font-medium w-24">Linha no ficheiro</th>
-                    <th className="text-left py-2 pr-4 font-medium">Valor encontrado</th>
-                    <th className="text-left py-2 font-medium">Problema</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {error.details.slice(0, maxPreview).map((d, i) => (
-                    <tr key={i} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-2 pr-6">
-                        <span className="inline-flex items-center justify-center h-6 min-w-[2.5rem] rounded-md bg-muted text-xs font-mono font-medium text-muted-foreground">
-                          {d.row}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <code className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive font-mono break-all">
-                          {d.value || '(vazio)'}
-                        </code>
-                      </td>
-                      <td className="py-2 text-xs text-muted-foreground">
-                        {error.ruleLabel === 'Número armazenado como texto no Excel'
-                          ? 'Erro causado por número armazenado como texto no Excel'
-                          : `Não corresponde a "${error.ruleLabel}"`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {error.details.length > maxPreview && (
-                <p className="text-xs text-muted-foreground text-center py-2 border-t border-border mt-2">
-                  A mostrar {maxPreview} de {error.details.length} erros
-                </p>
+  return (
+    <>
+      <HelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        columnName={error.column}
+        errorType={error.ruleLabel}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.03 }}
+        className="rounded-xl bg-card shadow-soft overflow-hidden border border-border"
+      >
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-start sm:items-center gap-3 p-3 sm:p-4 text-left hover:bg-muted/40 transition-colors"
+        >
+          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+            <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: 'hsl(var(--warning))' }} />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-foreground text-sm leading-tight truncate">{error.column}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug line-clamp-2">{error.ruleLabel}</p>
+
+            {/* Em mobile: badge + botão ficam abaixo do texto */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 sm:hidden">
+              <span className="error-badge">{error.failCount} erro{error.failCount > 1 ? 's' : ''}</span>
+              {showHelp && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setHelpOpen(true); }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+                  style={{ background: 'hsl(270 60% 38% / 0.1)', color: 'hsl(270 60% 38%)' }}
+                >
+                  <HelpCircle className="h-3 w-3" />
+                  Como corrigir?
+                </button>
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          </div>
+
+          {/* Em desktop: badge + botão ficam à direita */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
+            {showHelp && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setHelpOpen(true); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+                style={{ background: 'hsl(270 60% 38% / 0.1)', color: 'hsl(270 60% 38%)' }}
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+                Como corrigir?
+              </button>
+            )}
+            <span className="error-badge">{error.failCount} erro{error.failCount > 1 ? 's' : ''}</span>
+          </div>
+
+          {expanded
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
+          }
+        </button>
+
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="border-t border-border px-3 sm:px-4 py-3 max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground text-xs border-b border-border">
+                      <th className="text-left py-1.5 pr-4 font-medium">Linha</th>
+                      <th className="text-left py-1.5 font-medium">Valor encontrado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {error.details.slice(0, maxPreview).map((d, i) => (
+                      <tr key={i} className="border-b border-border/50 last:border-0">
+                        <td className="py-1.5 pr-4 font-mono text-xs text-muted-foreground">{d.row}</td>
+                        <td className="py-1.5">
+                          <code className="rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive font-mono break-all">
+                            {d.value || '(vazio)'}
+                          </code>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {error.details.length > maxPreview && (
+                  <p className="text-xs text-muted-foreground text-center py-2 border-t border-border mt-2">
+                    A mostrar {maxPreview} de {error.details.length} erros
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </>
   );
 }
 
 export default function ErrorDashboard({ result, fileName }: Props) {
   if (!result) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
-        <FileWarning className="mx-auto h-16 w-16 text-muted-foreground/30 mb-4" />
-        <h3 className="text-lg font-semibold font-heading text-muted-foreground mb-1">Nenhum ficheiro analisado</h3>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 sm:py-20">
+        <FileWarning className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30 mb-4" />
+        <h3 className="text-base sm:text-lg font-semibold font-heading text-muted-foreground mb-1">Nenhum ficheiro analisado</h3>
         <p className="text-sm text-muted-foreground">Vai à aba "Inserir Ficheiro" para carregar uma planilha.</p>
       </motion.div>
     );
@@ -107,34 +140,34 @@ export default function ErrorDashboard({ result, fileName }: Props) {
 
   if (result.success) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
-        <div className="mx-auto h-16 w-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'hsl(var(--success) / 0.1)' }}>
-          <BarChart3 className="h-8 w-8 text-success" />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 sm:py-20">
+        <div className="mx-auto h-14 w-14 sm:h-16 sm:w-16 rounded-full flex items-center justify-center mb-4" style={{ background: 'hsl(var(--success) / 0.1)' }}>
+          <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 text-success" />
         </div>
-        <h3 className="text-lg font-semibold font-heading text-foreground mb-1">Sem erros encontrados!</h3>
-        <p className="text-sm text-muted-foreground">O ficheiro <strong>{fileName}</strong> passou em todas as validações.</p>
+        <h3 className="text-base sm:text-lg font-semibold font-heading text-foreground mb-1">Sem erros encontrados!</h3>
+        <p className="text-sm text-muted-foreground">O ficheiro <strong className="break-all">{fileName}</strong> passou em todas as validações.</p>
       </motion.div>
     );
   }
 
   const totalCellErrors = result.cellErrors.reduce((sum, e) => sum + e.failCount, 0);
-  const hasAddressErrors = result.cellErrors.some((e) => e.column.endsWith('(morada incompleta)'));
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-xl bg-card border border-border p-4 shadow-soft">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+        <div className="col-span-2 sm:col-span-1 rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft">
           <p className="text-xs text-muted-foreground font-medium mb-1">Ficheiro</p>
-          <p className="text-sm font-semibold text-foreground truncate">{fileName}</p>
+          <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{fileName}</p>
         </div>
-        <div className="rounded-xl bg-card border border-border p-4 shadow-soft">
-          <p className="text-xs text-muted-foreground font-medium mb-1">Linhas analisadas</p>
-          <p className="text-2xl font-bold font-heading text-foreground">{result.rowCount}</p>
+        <div className="rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft">
+          <p className="text-xs text-muted-foreground font-medium mb-1">Linhas</p>
+          <p className="text-xl sm:text-2xl font-bold font-heading text-foreground">{result.rowCount}</p>
         </div>
-        <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4 shadow-soft">
+        <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-3 sm:p-4 shadow-soft">
           <p className="text-xs text-destructive font-medium mb-1">Total de erros</p>
-          <p className="text-2xl font-bold font-heading text-destructive">
+          <p className="text-xl sm:text-2xl font-bold font-heading text-destructive">
             {result.columnErrors.length + totalCellErrors}
           </p>
         </div>
@@ -144,11 +177,11 @@ export default function ErrorDashboard({ result, fileName }: Props) {
       {result.columnErrors.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Columns3 className="h-5 w-5 text-destructive" />
-            <h3 className="font-bold font-heading text-foreground">Colunas em falta ({result.columnErrors.length})</h3>
+            <Columns3 className="h-4 w-4 sm:h-5 sm:w-5 text-destructive shrink-0" />
+            <h3 className="font-bold font-heading text-foreground text-sm sm:text-base">Colunas em falta ({result.columnErrors.length})</h3>
           </div>
-          <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-4 space-y-2">
-            <p className="text-sm text-muted-foreground mb-1">Estas colunas obrigatórias não foram encontradas no ficheiro:</p>
+          <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-3 sm:p-4 space-y-2">
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3">Estas colunas obrigatórias não foram encontradas:</p>
             <div className="flex flex-wrap gap-2">
               {result.columnErrors.map((e, i) => (
                 <motion.div
@@ -156,28 +189,13 @@ export default function ErrorDashboard({ result, fileName }: Props) {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.05 }}
-                  className="flex items-center gap-1.5 rounded-lg bg-card border border-destructive/20 px-3 py-2 shadow-soft"
+                  className="flex items-center gap-1.5 rounded-lg bg-card border border-destructive/20 px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-soft"
                 >
                   <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
-                  <span className="text-sm font-medium text-foreground">{e.column}</span>
+                  <span className="text-xs sm:text-sm font-medium text-foreground">{e.column}</span>
                 </motion.div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Address rule info */}
-      {hasAddressErrors && (
-        <div className="rounded-xl bg-warning/5 border border-warning/30 p-4 flex gap-3 items-start">
-          <AlertTriangle className="h-5 w-5" style={{ color: 'hsl(var(--warning))' }} />
-          <div className="space-y-1">
-            <h4 className="text-sm font-semibold text-foreground">Regra especial para endereço</h4>
-            <p className="text-xs text-muted-foreground">
-              Nos ficheiros de clientes, os campos de endereço (CEP, Logradouro, Número, Complemento, Bairro,
-              Referência, Cidade e Estado) não são obrigatórios se todos estiverem vazios. Mas, se preencher
-              qualquer um deles numa linha, os restantes também precisam ser preenchidos para essa mesma linha.
-            </p>
           </div>
         </div>
       )}
@@ -186,12 +204,12 @@ export default function ErrorDashboard({ result, fileName }: Props) {
       {result.cellErrors.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Grid3X3 className="h-5 w-5" style={{ color: 'hsl(var(--warning))' }} />
-            <h3 className="font-bold font-heading text-foreground">
-              Erros nas células ({totalCellErrors} erros em {result.cellErrors.length} coluna{result.cellErrors.length > 1 ? 's' : ''})
+            <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" style={{ color: 'hsl(var(--warning))' }} />
+            <h3 className="font-bold font-heading text-foreground text-sm sm:text-base">
+              Erros nas células ({totalCellErrors} em {result.cellErrors.length} coluna{result.cellErrors.length > 1 ? 's' : ''})
             </h3>
           </div>
-          <p className="text-sm text-muted-foreground">Clica em cada item para ver exatamente onde está o erro:</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">Clica em cada item para ver os detalhes:</p>
           <div className="space-y-2">
             {result.cellErrors.map((e, i) => (
               <CellErrorRow key={i} error={e} index={i} />

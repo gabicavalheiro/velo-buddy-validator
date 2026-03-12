@@ -1,4 +1,3 @@
-// Página inicial: permite escolher o tipo de ficheiro, enviar a planilha e exibir o resultado da validação.
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,8 +6,10 @@ import FileDropZone from '@/components/FileDropZone';
 import ErrorDashboard from '@/components/ErrorDashboard';
 import { FILE_TYPES } from '@/lib/validationRules';
 import { parseFile, validateWorkbook, type ValidationResult } from '@/lib/validateFile';
-import { Loader2, ShieldCheck, Upload, LayoutDashboard, CheckCircle2 } from 'lucide-react';
+import { Loader2, Upload, LayoutDashboard, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import logoVelo from '@/assets/logo-velo.png';
+import logoCirculo from '@/assets/logo-circulo.png';
 
 const Index = () => {
   const [fileType, setFileType] = useState<string>('');
@@ -28,7 +29,7 @@ const Index = () => {
       const validationResult = validateWorkbook(workbook, config);
       setResult(validationResult);
       if (validationResult.success) {
-        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#34d399', '#fbbf24', '#60a5fa', '#f472b6'] });
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#7c3aed', '#ea580c', '#a855f7', '#f97316'] });
       } else {
         setActiveTab('dashboard');
       }
@@ -45,99 +46,138 @@ const Index = () => {
     }
   };
 
-  const totalErrors = result ? result.columnErrors.length + result.cellErrors.reduce((sum, e) => sum + e.failCount, 0) : 0;
+  const totalErrors = result
+    ? result.columnErrors.length + result.cellErrors.reduce((sum, e) => sum + e.failCount, 0)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:py-16">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 mb-4">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold text-primary">Validador Velo</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold font-heading text-foreground mb-3">
-            Validador de Planilhas
-          </h1>
-          <p className="text-base text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Olá! Carrega aqui o teu ficheiro e nós ajudamos a garantir que a importação corre na perfeição. 😊
-          </p>
-        </motion.div>
+    <div className="min-h-screen min-h-dvh flex flex-col md:flex-row">
 
-        {/* Success banner */}
-        {result?.success && !loading && (
+      {/* Faixa lateral — só desktop */}
+      <div
+        className="hidden md:flex w-48 lg:w-56 shrink-0 flex-col items-center justify-center overflow-hidden relative"
+        style={{ background: 'linear-gradient(160deg, hsl(300 60% 20%) 0%, hsl(340 55% 30%) 100%)' }}
+      >
+        <img
+          src={logoCirculo}
+          alt=""
+          className="absolute -right-16 w-64 lg:w-72 opacity-80 select-none pointer-events-none"
+          style={{ top: '50%', transform: 'translateY(-50%)' }}
+        />
+      </div>
+
+      {/* Faixa topo — só mobile */}
+      <div
+        className="md:hidden flex items-center justify-center py-4 px-4"
+        style={{ background: 'linear-gradient(90deg, hsl(300 60% 20%) 0%, hsl(340 55% 30%) 100%)' }}
+      >
+        <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-10 w-auto" />
+      </div>
+
+      {/* Conteúdo principal */}
+      <div className="flex-1 flex flex-col items-center justify-start px-4 py-6 sm:py-10 bg-background overflow-y-auto">
+        <div className="w-full max-w-2xl">
+
+          {/* Logo — só desktop */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="rounded-2xl p-6 text-center shadow-card mb-8"
-            style={{ background: 'hsl(var(--success) / 0.08)' }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="hidden md:flex flex-col items-center mb-8"
           >
-            <CheckCircle2 className="mx-auto h-12 w-12 text-success mb-3" />
-            <h2 className="text-xl font-bold font-heading text-foreground mb-1">Tudo perfeito! 🎉</h2>
-            <p className="text-muted-foreground">As colunas e as células têm a formatação exata. Podes importar sem medo!</p>
-            <p className="mt-2 text-sm text-muted-foreground">{result.rowCount} linhas analisadas em <strong>{fileName}</strong></p>
+            <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-16 lg:h-20 w-auto mb-4 select-none" />
+            <h1 className="text-xl sm:text-2xl font-bold font-heading text-foreground">Validador de Planilhas</h1>
+            <p className="text-sm text-muted-foreground text-center max-w-sm mt-1 leading-relaxed">
+              Carregue o ficheiro e verifique se está pronto para importação.
+            </p>
           </motion.div>
-        )}
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 h-12 rounded-xl bg-muted p-1 mb-6">
-            <TabsTrigger value="upload" className="rounded-lg text-sm font-semibold gap-2 data-[state=active]:shadow-soft">
-              <Upload className="h-4 w-4" />
-              Inserir Ficheiro
-            </TabsTrigger>
-            <TabsTrigger value="dashboard" className="rounded-lg text-sm font-semibold gap-2 data-[state=active]:shadow-soft relative">
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard de Erros
-              {result && !result.success && totalErrors > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
-                  {totalErrors}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          {/* Título mobile */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="md:hidden text-center mb-5 mt-2"
+          >
+            <h1 className="text-lg font-bold font-heading text-foreground">Validador de Planilhas</h1>
+            <p className="text-xs text-muted-foreground mt-1">Carregue o ficheiro e verifique se está pronto para importação.</p>
+          </motion.div>
 
-          <TabsContent value="upload" className="mt-0">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-              {/* File Type Selector */}
-              <div>
-                <label className="block text-sm font-semibold text-foreground mb-2">Tipo de ficheiro</label>
-                <Select
-                  value={fileType}
-                  onValueChange={(val) => { setFileType(val); setResult(null); }}
-                >
-                  <SelectTrigger className="w-full rounded-xl h-12 text-base shadow-soft bg-card">
-                    <SelectValue placeholder="Escolhe o tipo de ficheiro..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FILE_TYPES).map(([key, config]) => (
-                      <SelectItem key={key} value={key}>{config.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Drop Zone */}
-              <div>
-                <FileDropZone onFileSelect={handleFileSelect} disabled={!fileType} />
-                {!fileType && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">Seleciona primeiro o tipo de ficheiro acima ☝️</p>
-                )}
-              </div>
-
-              {loading && (
-                <div className="flex items-center justify-center gap-3 py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-muted-foreground font-medium">A validar o ficheiro...</span>
-                </div>
-              )}
+          {/* Banner de sucesso */}
+          {result?.success && !loading && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl p-4 sm:p-6 text-center shadow-card mb-5"
+              style={{ background: 'hsl(var(--success) / 0.08)', border: '1px solid hsl(var(--success) / 0.2)' }}
+            >
+              <CheckCircle2 className="mx-auto h-8 w-8 sm:h-10 sm:w-10 mb-2" style={{ color: 'hsl(var(--success))' }} />
+              <h2 className="text-base sm:text-lg font-bold font-heading text-foreground mb-1">Tudo perfeito! 🎉</h2>
+              <p className="text-muted-foreground text-xs sm:text-sm">As colunas e células estão corretas. Pode importar sem problemas!</p>
+              <p className="mt-1 text-xs text-muted-foreground">{result.rowCount} linhas analisadas em <strong className="break-all">{fileName}</strong></p>
             </motion.div>
-          </TabsContent>
+          )}
 
-          <TabsContent value="dashboard" className="mt-0">
-            <ErrorDashboard result={result} fileName={fileName} />
-          </TabsContent>
-        </Tabs>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList
+              className="w-full grid grid-cols-2 h-11 rounded-xl p-1 mb-4"
+              style={{ background: 'hsl(270 20% 90%)' }}
+            >
+              <TabsTrigger value="upload" className="rounded-lg text-xs sm:text-sm font-semibold gap-1.5 data-[state=active]:shadow-soft data-[state=active]:text-primary">
+                <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                <span className="truncate">Inserir Ficheiro</span>
+              </TabsTrigger>
+              <TabsTrigger value="dashboard" className="rounded-lg text-xs sm:text-sm font-semibold gap-1.5 data-[state=active]:shadow-soft data-[state=active]:text-primary relative">
+                <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                <span className="truncate">Dashboard de Erros</span>
+                {result && !result.success && totalErrors > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full text-white text-[10px] font-bold px-1"
+                    style={{ background: 'hsl(18 90% 52%)' }}
+                  >
+                    {totalErrors}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="upload" className="mt-0">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">Tipo de ficheiro</label>
+                  <Select value={fileType} onValueChange={(val) => { setFileType(val); setResult(null); }}>
+                    <SelectTrigger className="w-full rounded-xl h-11 sm:h-12 text-sm sm:text-base shadow-soft bg-card border-border">
+                      <SelectValue placeholder="Escolha o tipo de ficheiro..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(FILE_TYPES).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <FileDropZone onFileSelect={handleFileSelect} disabled={!fileType} />
+                  {!fileType && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">Selecione primeiro o tipo de ficheiro acima ☝️</p>
+                  )}
+                </div>
+
+                {loading && (
+                  <div className="flex items-center justify-center gap-3 py-6">
+                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'hsl(270 60% 38%)' }} />
+                    <span className="text-muted-foreground text-sm font-medium">A validar o ficheiro...</span>
+                  </div>
+                )}
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="dashboard" className="mt-0">
+              <ErrorDashboard result={result} fileName={fileName} />
+            </TabsContent>
+          </Tabs>
+
+        </div>
       </div>
     </div>
   );
