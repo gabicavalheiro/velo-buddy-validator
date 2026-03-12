@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle } from 'lucide-react';
+import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
-import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL } from '@/lib/validateFile';
+import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
 import HelpModal from './HelpModal';
 
 interface Props {
@@ -17,7 +17,10 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
 
   const isNumberAsText = error.ruleLabel === NUMBER_AS_TEXT_LABEL;
   const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
-  const showHelp = isNumberAsText || isLeadingZero;
+  const isDateSerial = error.ruleLabel === DATE_AS_SERIAL_LABEL;
+  const isDateWrongFormat = error.ruleLabel === DATE_WRONG_FORMAT_LABEL;
+  const isJurosRule = error.ruleLabel === JUROS_RULE_LABEL;
+  const showHelp = isNumberAsText || isLeadingZero || isDateSerial || isDateWrongFormat || isJurosRule;
 
   return (
     <>
@@ -93,6 +96,35 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
               className="overflow-hidden"
             >
               <div className="border-t border-border px-3 sm:px-4 py-3 max-h-64 overflow-y-auto">
+
+                {/* Card explicativo da regra de juros */}
+                {isJurosRule && (
+                  <div
+                    className="rounded-xl p-3 mb-3 flex gap-2.5"
+                    style={{ background: 'hsl(270 60% 38% / 0.06)', border: '1px solid hsl(270 60% 38% / 0.15)' }}
+                  >
+                    <Percent className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'hsl(270 60% 38%)' }} />
+                    <div className="space-y-1.5 min-w-0">
+                      <p className="text-xs font-semibold" style={{ color: 'hsl(270 60% 32%)' }}>Regra de formatação — Juros / Multa</p>
+                      <ul className="text-xs text-muted-foreground space-y-0.5 leading-relaxed">
+                        <li>• Até <strong>5 caracteres</strong> no total (ex: <code className="bg-muted px-1 rounded">10,50</code>)</li>
+                        <li>• Até <strong>2 casas decimais</strong>, separadas por <strong>vírgula</strong></li>
+                        <li>• Formatação da célula: <strong>Geral</strong></li>
+                      </ul>
+                      <div
+                        className="rounded-lg px-2.5 py-2 mt-1"
+                        style={{ background: 'hsl(270 60% 38% / 0.06)', border: '1px solid hsl(270 60% 38% / 0.12)' }}
+                      >
+                        <p className="text-xs font-semibold text-foreground mb-0.5">Como o sistema calcula:</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          O juros é dividido pelos dias de atraso. Se o juros é <strong>10%</strong> ao mês e há <strong>3 dias</strong> de atraso:
+                          <span className="block mt-1 font-mono font-semibold" style={{ color: 'hsl(270 60% 38%)' }}>3 ÷ 10 = 0,33%</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-muted-foreground text-xs border-b border-border">
@@ -155,6 +187,32 @@ export default function ErrorDashboard({ result, fileName }: Props) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
 
+      {/* Linha de instruções detectada — alerta prioritário */}
+      {(() => {
+        const instrError = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+        if (!instrError) return null;
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-xl p-4 flex gap-3 border"
+            style={{ background: 'hsl(18 90% 52% / 0.08)', borderColor: 'hsl(18 90% 52% / 0.3)' }}
+          >
+            <AlertOctagon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'hsl(18 90% 52%)' }} />
+            <div className="min-w-0">
+              <p className="font-bold text-sm text-foreground">Linha de instruções detectada</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                A <strong>linha 2</strong> parece conter textos de orientação de preenchimento, não dados reais.
+                Apague essa linha inteira antes de importar para que a validação funcione corretamente.
+              </p>
+              <code className="mt-1.5 block text-xs bg-background rounded px-2 py-1 border border-border text-muted-foreground truncate">
+                {instrError.details[0]?.value}
+              </code>
+            </div>
+          </motion.div>
+        );
+      })()}
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
         <div className="col-span-2 sm:col-span-1 rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft">
@@ -198,6 +256,48 @@ export default function ErrorDashboard({ result, fileName }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Juros rule explanation card — aparece quando há erros de formato em colunas de Juros/Multa */}
+      {result.cellErrors.some(e => e.ruleLabel === JUROS_RULE_LABEL) && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border overflow-hidden"
+          style={{ borderColor: 'hsl(270 60% 38% / 0.25)', background: 'hsl(270 60% 38% / 0.04)' }}
+        >
+          <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'hsl(270 60% 38% / 0.15)', background: 'hsl(270 60% 38% / 0.08)' }}>
+            <Percent className="h-4 w-4 shrink-0" style={{ color: 'hsl(270 60% 38%)' }} />
+            <span className="text-sm font-bold font-heading" style={{ color: 'hsl(270 60% 38%)' }}>Regra para Juros e Multa</span>
+          </div>
+          <div className="px-4 py-3 space-y-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            <p>Apenas números com <strong>até 5 caracteres</strong> e <strong>até 2 casas decimais</strong>. Separe os decimais com <strong>vírgula</strong>. Use a formatação <strong>Geral</strong> no Excel.</p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-1">✅ Aceito</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['10', '10,5', '10,50', '1,99', '100'].map(v => (
+                    <code key={v} className="rounded bg-green-100 text-green-700 px-1.5 py-0.5 text-xs font-mono border border-green-200">{v}</code>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-1">❌ Rejeitado</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['10.5', '10,500', '10,5%', '1000,5'].map(v => (
+                    <code key={v} className="rounded bg-red-100 text-red-700 px-1.5 py-0.5 text-xs font-mono border border-red-200">{v}</code>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg p-2.5 mt-1" style={{ background: 'hsl(270 60% 38% / 0.07)', border: '1px solid hsl(270 60% 38% / 0.15)' }}>
+              <p className="text-xs" style={{ color: 'hsl(270 60% 32%)' }}>
+                💡 <strong>Como o sistema calcula:</strong> o valor é dividido pelos dias de atraso.
+                Ex: juros de <strong>10%</strong> ao mês com <strong>3 dias</strong> de atraso → <strong>3 ÷ 10 = 0,33%</strong>.
+              </p>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {/* Cell errors */}

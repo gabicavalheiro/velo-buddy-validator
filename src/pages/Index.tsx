@@ -6,10 +6,11 @@ import FileDropZone from '@/components/FileDropZone';
 import ErrorDashboard from '@/components/ErrorDashboard';
 import { FILE_TYPES } from '@/lib/validationRules';
 import { parseFile, validateWorkbook, type ValidationResult } from '@/lib/validateFile';
-import { Loader2, Upload, LayoutDashboard, CheckCircle2 } from 'lucide-react';
+import { Loader2, Upload, LayoutDashboard, CheckCircle2, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import logoVelo from '@/assets/logo-velo.png';
 import logoCirculo from '@/assets/logo-circulo.png';
+import GuideDrawer from '@/components/GuideDrawer.tsx';
 
 const Index = () => {
   const [fileType, setFileType] = useState<string>('');
@@ -17,6 +18,7 @@ const Index = () => {
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
   const [fileName, setFileName] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const handleFileSelect = async (file: File) => {
     if (!fileType) return;
@@ -51,6 +53,7 @@ const Index = () => {
     : 0;
 
   return (
+    <>
     <div className="min-h-screen min-h-dvh flex flex-col md:flex-row">
 
       {/* Faixa lateral — só desktop */}
@@ -68,10 +71,17 @@ const Index = () => {
 
       {/* Faixa topo — só mobile */}
       <div
-        className="md:hidden flex items-center justify-center py-4 px-4"
+        className="md:hidden flex items-center justify-between py-3 px-4"
         style={{ background: 'linear-gradient(90deg, hsl(300 60% 20%) 0%, hsl(340 55% 30%) 100%)' }}
       >
-        <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-10 w-auto" />
+        <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-9 w-auto" />
+        <button
+          onClick={() => setGuideOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors text-white text-xs font-semibold"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          Guia
+        </button>
       </div>
 
       {/* Conteúdo principal */}
@@ -82,8 +92,16 @@ const Index = () => {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="hidden md:flex flex-col items-center mb-8"
+            className="hidden md:flex flex-col items-center mb-8 relative w-full"
           >
+            <button
+              onClick={() => setGuideOpen(true)}
+              className="absolute top-0 right-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+              style={{ background: 'hsl(270 60% 38% / 0.08)', color: 'hsl(270 60% 38%)', border: '1px solid hsl(270 60% 38% / 0.2)' }}
+            >
+              <BookOpen className="h-4 w-4" />
+              Guia Rápido
+            </button>
             <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-16 lg:h-20 w-auto mb-4 select-none" />
             <h1 className="text-xl sm:text-2xl font-bold font-heading text-foreground">Validador de Planilhas</h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm mt-1 leading-relaxed">
@@ -180,6 +198,9 @@ const Index = () => {
         </div>
       </div>
     </div>
+
+      <GuideDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
+    </>
   );
 };
 

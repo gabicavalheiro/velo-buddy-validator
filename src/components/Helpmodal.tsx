@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MousePointer2, AlertTriangle, Hash, CheckCircle2, Type } from 'lucide-react';
-import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL } from '@/lib/validateFile';
+import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL } from '@/lib/validateFile';
 
 interface HelpModalProps {
   open: boolean;
@@ -63,15 +63,81 @@ const stepsLeadingZero = [
   },
 ];
 
+
+const stepsDate = [
+  {
+    icon: <MousePointer2 className="h-4 w-4 text-white" />,
+    color: 'hsl(270 60% 38%)',
+    title: 'Selecione toda a coluna',
+    description: (col: string) => <>Clique no cabeçalho da coluna <strong>"{col}"</strong> para selecionar todas as células.</>,
+  },
+  {
+    icon: <Hash className="h-4 w-4 text-white" />,
+    color: 'hsl(280 55% 35%)',
+    title: 'Abra os formatos de número',
+    description: () => <>Em <strong>Página Inicial</strong>, clique na seta do campo de formatação (onde aparece "Data" ou "Geral") e selecione <strong>"Mais Formatos de Número…"</strong> no final da lista.</>,
+  },
+  {
+    icon: <Type className="h-4 w-4 text-white" />,
+    color: 'hsl(290 50% 32%)',
+    title: 'Mude a localidade para Inglês (EUA)',
+    description: () => <>Na janela que abrir, vá em <strong>Número → Data</strong>. No campo <strong>Localidade (Idioma)</strong>, troque de <em>"Português (Brasil)"</em> para <strong>"Inglês (Estados Unidos)"</strong>.</>,
+  },
+  {
+    icon: <CheckCircle2 className="h-4 w-4 text-white" />,
+    color: 'hsl(300 45% 28%)',
+    title: 'Escolha o formato Ano-Mês-Dia e confirme',
+    description: () => <>Na lista de formatos, selecione o padrão <code className="bg-muted px-1 rounded text-xs">YYYY-MM-DD</code> (ex: <code className="bg-muted px-1 rounded text-xs">2024-12-31</code>) e clique em <strong>OK</strong>.</>,
+  },
+];
+
+
+const stepsDateWrongFormat = [
+  {
+    icon: <MousePointer2 className="h-4 w-4 text-white" />,
+    color: 'hsl(270 60% 38%)',
+    title: 'Selecione toda a coluna',
+    description: (col: string) => <>Clique no cabeçalho da coluna <strong>"{col}"</strong> para selecionar todas as células.</>,
+  },
+  {
+    icon: <Hash className="h-4 w-4 text-white" />,
+    color: 'hsl(280 55% 35%)',
+    title: 'Abra os formatos de número',
+    description: () => <>Em <strong>Página Inicial</strong>, clique na seta do campo de formatação e selecione <strong>"Mais Formatos de Número…"</strong> no final da lista.</>,
+  },
+  {
+    icon: <Type className="h-4 w-4 text-white" />,
+    color: 'hsl(290 50% 32%)',
+    title: 'Mude a localidade para Inglês (EUA)',
+    description: () => <>Na janela, vá em <strong>Número → Data</strong>. No campo <strong>Localidade (Idioma)</strong>, troque de <em>"Português (Brasil)"</em> para <strong>"Inglês (Estados Unidos)"</strong>.</>,
+  },
+  {
+    icon: <CheckCircle2 className="h-4 w-4 text-white" />,
+    color: 'hsl(300 45% 28%)',
+    title: 'Escolha o formato Ano-Mês-Dia e confirme',
+    description: () => <>Selecione o padrão <code className="bg-muted px-1 rounded text-xs">YYYY-MM-DD</code> (ex: <code className="bg-muted px-1 rounded text-xs">2024-12-31</code>) e clique em <strong>OK</strong>.</>,
+  },
+];
+
 export default function HelpModal({ open, onClose, columnName, errorType }: HelpModalProps) {
   const isLeadingZero = errorType === LEADING_ZERO_LABEL;
-  const steps = isLeadingZero ? stepsLeadingZero : stepsNumberAsText;
+  const isDateSerial = errorType === DATE_AS_SERIAL_LABEL;
+  const isDateWrongFormat = errorType === DATE_WRONG_FORMAT_LABEL;
+  const steps = isDateWrongFormat ? stepsDateWrongFormat : isDateSerial ? stepsDate : isLeadingZero ? stepsLeadingZero : stepsNumberAsText;
 
-  const title = isLeadingZero ? 'Como corrigir: Zeros à esquerda' : 'Como corrigir: Número como texto';
-  const description = isLeadingZero
+  const title = isDateWrongFormat ? 'Como corrigir: Formato de data inválido' : isDateSerial ? 'Como corrigir: Data em formato errado' : isLeadingZero ? 'Como corrigir: Zeros à esquerda' : 'Como corrigir: Número como texto';
+  const description = isDateWrongFormat
+    ? 'A data está como texto mas no formato incorreto (ex: 31/12/2020). O sistema exige AAAA-MM-DD. Siga os passos:'
+    : isDateSerial
+    ? 'A coluna está com células formatadas como Data no Excel. O sistema exige o formato texto AAAA-MM-DD (ex: 2024-12-31). Siga os passos:'
+    : isLeadingZero
     ? 'Esta coluna está formatada como número. O Excel vai remover zeros à esquerda (ex: CPF "04652781407" vira "4652781407") na importação.'
     : 'As células têm números salvos como texto (triângulo verde no Excel). Siga os passos:';
-  const tip = isLeadingZero
+  const tip = isDateWrongFormat
+    ? 'O formato YYYY-MM-DD com localidade Inglês (EUA) garante que o Excel exporte as datas no padrão americano exigido pelo Velo.'
+    : isDateSerial
+    ? 'O formato YYYY-MM-DD com localidade Inglês (EUA) garante que o Excel exporte as datas no padrão americano exigido pelo Velo.'
+    : isLeadingZero
     ? 'CPF, CNPJ, IE e CEST precisam de todos os dígitos. Sempre use "Texto" para essas colunas.'
     : 'Depois de corrigir, salve e valide novamente aqui no Validador Velo.';
 

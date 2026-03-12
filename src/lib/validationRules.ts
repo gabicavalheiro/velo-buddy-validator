@@ -1,4 +1,4 @@
-export type CellRule = 'numbers' | 'date' | 'currency' | 'binary';
+export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros';
 
 export interface FileTypeConfig {
   label: string;
@@ -11,6 +11,8 @@ export interface FileTypeConfig {
   // Colunas que podem ter zeros à esquerda significativos (CPF, CNPJ, IE, CEST...)
   // Se estiverem com formatação numérica no Excel, os zeros serão perdidos na importação.
   leadingZeroColumns?: string[];
+  // Colunas onde cada linha deve ter um valor preenchido (obrigatoriedade a nível de célula)
+  requiredValueColumns?: string[];
 }
 
 export const FILE_TYPES: Record<string, FileTypeConfig> = {
@@ -102,6 +104,10 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Código da Pessoa':   'numbers',
       'Código da Empresa':  'numbers',
       'Valor':              'currency',
+      'Carência':           'numbers',
+      'Juros':              'juros',
+      'Multa':              'juros',
+      'Desconto':           'currency',
       'Data da Emissão':    'date',
       'Data de Vencimento': 'date',
     },
@@ -109,6 +115,10 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Código da Pessoa':   ['Cod Pessoa', 'CodPessoa', 'ID Pessoa'],
       'Código da Empresa':  ['Cod Empresa', 'CodEmpresa', 'ID Empresa'],
       'Valor':              ['Valor Total', 'Vl Total', 'Vl.'],
+      'Carência':           ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':              ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':              ['Multa (%)', 'Taxa Multa'],
+      'Desconto':           ['Desc', 'Desconto (%)'],
       'Data da Emissão':    ['Dt Emissão', 'Emissão', 'Data Emissao'],
       'Data de Vencimento': ['Dt Vencimento', 'Vencimento', 'Dt Venc'],
     },
@@ -117,11 +127,16 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     label: 'Contas a Receber',
     skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor em Aberto'],
+    requiredValueColumns: ['Código da Pessoa'],
     cellRules: {
       'Código da Pessoa':  'numbers',
       'Código da Empresa': 'numbers',
       'Valor em Aberto':   'currency',
       'Valor Quitado':     'currency',
+      'Carência':          'numbers',
+      'Juros':             'juros',
+      'Multa':             'juros',
+      'Desconto':          'currency',
       'Data de Emissão':   'date',
       'Vencimento':        'date',
       'Recebimento':       'date',
@@ -131,12 +146,17 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa'],
       'Valor em Aberto':   ['Vl Aberto', 'Saldo', 'Valor Aberto'],
       'Valor Quitado':     ['Vl Quitado', 'Quitado', 'Valor Pago'],
+      'Carência':          ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':             ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':             ['Multa (%)', 'Taxa Multa'],
+      'Desconto':          ['Desc', 'Desconto (%)'],
       'Data de Emissão':   ['Dt Emissão', 'Emissão', 'Data Emissao'],
       'Vencimento':        ['Dt Vencimento', 'Data Vencimento', 'Dt Venc'],
       'Recebimento':       ['Dt Recebimento', 'Data Recebimento', 'Dt Rec'],
     },
   },
 };
+
 
 export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; label: string }> = {
   numbers: {
@@ -162,5 +182,27 @@ export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; labe
   binary: {
     test: (val: string) => /^[01]$/.test(val.trim()),
     label: 'Binário (0 ou 1)',
+  },
+  // Juros/Multa: número com até 3 dígitos inteiros e até 2 casas decimais, formato GERAL.
+  // Com formato GERAL no Excel brasileiro, "10,50" é salvo como número 10.5 pelo Excel.
+  // O validador aceita ambas as representações:
+  //   - string com vírgula:  "10", "10,5", "10,50", "1,99", "100"  → typed as text or text-formatted
+  //   - número convertido:   "10.5", "10.50", "1.99"               → General format, Excel stored as number
+  // Rejeita: "10,500" (3 decimais), "10,5%" (símbolo), "1000" (>3 dígitos inteiros)
+  juros: {
+    test: (val: string) => {
+      const trimmed = val.trim();
+      // Aceita vírgula (texto digitado) ou ponto (número vindo do Excel General)
+      const normalized = trimmed.replace(',', '.');
+      const num = Number(normalized);
+      if (!Number.isFinite(num) || num < 0) return false;
+      // Até 3 dígitos na parte inteira
+      const [intPart, decPart = ''] = normalized.split('.');
+      if (intPart.length > 3) return false;
+      // Até 2 casas decimais
+      if (decPart.length > 2) return false;
+      return true;
+    },
+    label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
   },
 };
