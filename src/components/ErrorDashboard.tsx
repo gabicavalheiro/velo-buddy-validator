@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare, MapPin } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
 import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
-import HelpModal from './HelpModal';
+import HelpModal from './Helpmodal.tsx';
 import ClientMessageModal from './ClientMessagemodal.tsx';
 
 interface Props {
