@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent } from 'lucide-react';
+import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
-import { LEADING_ZERO_LABEL, NUMBER_AS_TEXT_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
-import HelpModal from './HelpModal';
+import { NUMBER_AS_TEXT_LABEL, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
+import HelpModal from './HelpModal.tsx';
+import ClientMessageModal from './Clientmessagemodal.tsx';
 
 interface Props {
   result: ValidationResult | null;
   fileName: string;
+  fileTypeLabel: string;
 }
 
 function CellErrorRow({ error, index }: { error: CellError; index: number }) {
@@ -16,10 +18,10 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
   const maxPreview = 100;
 
   const isNumberAsText = error.ruleLabel === NUMBER_AS_TEXT_LABEL;
-  const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
   const isDateSerial = error.ruleLabel === DATE_AS_SERIAL_LABEL;
   const isDateWrongFormat = error.ruleLabel === DATE_WRONG_FORMAT_LABEL;
   const isJurosRule = error.ruleLabel === JUROS_RULE_LABEL;
+  const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
   const showHelp = isNumberAsText || isLeadingZero || isDateSerial || isDateWrongFormat || isJurosRule;
 
   return (
@@ -29,6 +31,7 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
         onClose={() => setHelpOpen(false)}
         columnName={error.column}
         errorType={error.ruleLabel}
+        rule={error.rule}
       />
 
       <motion.div
@@ -159,7 +162,8 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
   );
 }
 
-export default function ErrorDashboard({ result, fileName }: Props) {
+export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Props) {
+  const [msgOpen, setMsgOpen] = useState(false);
   if (!result) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 sm:py-20">
@@ -317,6 +321,26 @@ export default function ErrorDashboard({ result, fileName }: Props) {
           </div>
         </div>
       )}
+
+      {/* Botão gerar mensagem para cliente */}
+      <div className="flex justify-center pt-2 pb-1">
+        <button
+          onClick={() => setMsgOpen(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          style={{ background: 'hsl(270 60% 38%)' }}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Gerar mensagem para o cliente
+        </button>
+      </div>
+
+      <ClientMessageModal
+        open={msgOpen}
+        onClose={() => setMsgOpen(false)}
+        result={result}
+        fileName={fileName}
+        fileTypeLabel={fileTypeLabel}
+      />
     </motion.div>
   );
 }

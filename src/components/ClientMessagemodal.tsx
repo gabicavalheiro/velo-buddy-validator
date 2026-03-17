@@ -1,0 +1,237 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Copy, Check, MessageSquare } from 'lucide-react';
+import type { CellRule } from '@/lib/validationRules';
+import type { ValidationResult, CellError } from '@/lib/validateFile';
+import {
+  NUMBER_AS_TEXT_LABEL,
+  LEADING_ZERO_LABEL,
+  DATE_AS_SERIAL_LABEL,
+  DATE_WRONG_FORMAT_LABEL,
+  JUROS_RULE_LABEL,
+  INSTRUCTION_ROW_LABEL,
+  REQUIRED_VALUE_LABEL,
+} from '@/lib/validateFile';
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  result: ValidationResult;
+  fileName: string;
+  fileTypeLabel: string;
+}
+
+// Formato final exigido após corrigir "número como texto", por tipo de regra
+function finalFormatLabel(rule: CellRule): string {
+  switch (rule) {
+    case 'currency': return 'Moeda (2 casas decimais, sem R$)';
+    case 'juros':    return 'Geral';
+    case 'stock':    return 'Número (inteiro, pode ser negativo)';
+    case 'numbers':  return 'Geral';
+    case 'binary':   return 'Geral';
+    default:         return 'Geral';
+  }
+}
+
+function finalFormatPath(rule: CellRule): string {
+  switch (rule) {
+    case 'currency': return 'Página Inicial → Número → Moeda';
+    case 'stock':
+    case 'numbers':  return 'Página Inicial → Número → Número';
+    default:         return 'Página Inicial → Número → Geral';
+  }
+}
+
+// Agrupa os erros de célula por (ruleLabel, rule) para conseguir instruções específicas
+function groupErrors(cellErrors: CellError[]): Map<string, { rule: CellRule; cols: string[] }> {
+  const map = new Map<string, { rule: CellRule; cols: string[] }>();
+  for (const e of cellErrors) {
+    if (e.ruleLabel === INSTRUCTION_ROW_LABEL) continue;
+    const key = `${e.ruleLabel}||${e.rule}`;
+    if (!map.has(key)) map.set(key, { rule: e.rule, cols: [] });
+    map.get(key)!.cols.push(e.column);
+  }
+  return map;
+}
+
+function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel: string): string {
+  const lines: string[] = [];
+
+  lines.push('Olá! 😊');
+  lines.push('');
+  lines.push(`Validamos a planilha *${fileName}* (${fileTypeLabel}) e encontramos alguns pontos que precisam ser corrigidos antes da importação:`);
+  lines.push('');
+
+  // Linha de instruções
+  const instrError = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+  if (instrError) {
+    lines.push('⚠️ *Linha de instruções detectada*');
+    lines.push('A linha 2 parece conter textos de orientação, não dados reais. Por favor, apague essa linha inteira antes de importar.');
+    lines.push('');
+  }
+
+  // Colunas em falta
+  if (result.columnErrors.length > 0) {
+    lines.push('📋 *Colunas obrigatórias em falta*');
+    result.columnErrors.forEach(e => lines.push(`  • ${e.column}`));
+    lines.push('Por favor, adicione essas colunas e preencha os dados correspondentes.');
+    lines.push('');
+  }
+
+  const grouped = groupErrors(result.cellErrors);
+
+  for (const [key, { rule, cols }] of grouped) {
+    const ruleLabel = key.split('||')[0];
+    const colList = cols.map(c => `*${c}*`).join(', ');
+
+    if (ruleLabel === NUMBER_AS_TEXT_LABEL) {
+      const fmt = finalFormatLabel(rule);
+      const path = finalFormatPath(rule);
+      lines.push('🔢 *Número armazenado como texto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Os valores estão salvos como texto no Excel (triângulo verde no canto da célula). Para corrigir:');
+      lines.push('  1. Selecione a(s) coluna(s) indicada(s)');
+      lines.push('  2. Clique no ícone ⚠️ que aparece à esquerda');
+      lines.push('  3. Escolha *"Converter para Número"*');
+      lines.push(`  4. Com a coluna ainda selecionada, vá em *${path}* e aplique o formato *"${fmt}"*`);
+      lines.push('');
+
+    } else if (ruleLabel === LEADING_ZERO_LABEL) {
+      lines.push('🔤 *Zeros à esquerda em risco — formate como Texto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Essa(s) coluna(s) está(ão) formatada(s) como número no Excel, o que remove automaticamente os zeros à esquerda (ex: CPF "04652781407" vira "4652781407"). Para corrigir:');
+      lines.push('  1. Selecione a(s) coluna(s)');
+      lines.push('  2. Vá em *Página Inicial → Número → Texto*');
+      lines.push('  3. Redigite os valores com todos os dígitos, incluindo os zeros à esquerda');
+      lines.push('  ⚠️ O formato Texto deve ser aplicado *antes* de digitar os valores.');
+      lines.push('');
+
+    } else if (ruleLabel === DATE_AS_SERIAL_LABEL) {
+      lines.push('📅 *Data em formato de data do Excel*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('As datas precisam estar como texto no padrão *AAAA-MM-DD* (ex: 2024-12-31). Para corrigir:');
+      lines.push('  1. Selecione a(s) coluna(s)');
+      lines.push('  2. Vá em *Página Inicial → Mais Formatos de Número*');
+      lines.push('  3. Em "Número → Data", mude a localidade para *Inglês (Estados Unidos)*');
+      lines.push('  4. Escolha o formato *YYYY-MM-DD* e clique OK');
+      lines.push('');
+
+    } else if (ruleLabel === DATE_WRONG_FORMAT_LABEL) {
+      lines.push('📅 *Formato de data incorreto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('As datas estão num formato inválido (ex: 31/12/2024 ou 2024/12/31). O sistema exige *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos de formatação de data acima.');
+      lines.push('');
+
+    } else if (ruleLabel === JUROS_RULE_LABEL) {
+      lines.push('📊 *Formato de Juros/Multa incorreto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Os valores devem ter no máximo 3 dígitos inteiros e 2 casas decimais separadas por *vírgula* (ex: 10,50). A célula deve estar no formato *Geral* no Excel.');
+      lines.push('');
+
+    } else if (ruleLabel === REQUIRED_VALUE_LABEL) {
+      lines.push('🔴 *Campo obrigatório vazio*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Existem linhas sem preenchimento nessa(s) coluna(s) obrigatória(s). Por favor, preencha todos os campos.');
+      lines.push('');
+
+    } else {
+      // Erros genéricos de formato (binary, stock, numbers fora do padrão, etc.)
+      const fmt = finalFormatLabel(rule);
+      lines.push(`❌ *Valor inválido*`);
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push(`Formato esperado: *${fmt}*. Verifique os valores dessas colunas e ajuste a formatação das células em *${finalFormatPath(rule)}*.`);
+      lines.push('');
+    }
+  }
+
+  lines.push('Após realizar as correções, basta enviar a planilha novamente para validação. 🙏');
+  lines.push('Qualquer dúvida, estamos à disposição!');
+
+  return lines.join('\n');
+}
+
+export default function ClientMessageModal({ open, onClose, result, fileName, fileTypeLabel }: Props) {
+  const [copied, setCopied] = useState(false);
+  const message = buildMessage(result, fileName, fileTypeLabel);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <motion.div
+            key="modal"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full sm:max-w-lg bg-card sm:rounded-2xl rounded-t-2xl shadow-card overflow-hidden max-h-[92dvh] flex flex-col">
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shrink-0" style={{ background: 'hsl(270 60% 38%)' }}>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-white font-bold font-heading text-sm sm:text-base leading-tight">Mensagem para o cliente</h2>
+                    <p className="text-white/65 text-xs mt-0.5">Pronta para copiar e enviar</p>
+                  </div>
+                </div>
+                <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors shrink-0">
+                  <X className="h-4 w-4 text-white" />
+                </button>
+              </div>
+
+              {/* Message preview */}
+              <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+                <pre
+                  className="whitespace-pre-wrap text-xs sm:text-sm text-foreground leading-relaxed font-sans rounded-xl p-4 border border-border"
+                  style={{ background: 'hsl(220 20% 97%)' }}
+                >
+                  {message}
+                </pre>
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex gap-2 shrink-0">
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-border text-muted-foreground hover:bg-muted/40 transition-colors"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all"
+                  style={{ background: copied ? 'hsl(145 55% 38%)' : 'hsl(270 60% 38%)' }}
+                >
+                  {copied
+                    ? <><Check className="h-4 w-4" /> Copiado!</>
+                    : <><Copy className="h-4 w-4" /> Copiar mensagem</>
+                  }
+                </button>
+              </div>
+
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

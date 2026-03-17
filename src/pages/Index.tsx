@@ -9,7 +9,7 @@ import { parseFile, validateWorkbook, type ValidationResult } from '@/lib/valida
 import { Loader2, Upload, LayoutDashboard, CheckCircle2, BookOpen } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import logoVelo from '@/assets/logo-velo.png';
-import GuideDrawer from '@/components/GuideDrawer.tsx';
+import GuideDrawer from '@/components/GuideDrawer';
 
 const Index = () => {
   const [fileType, setFileType] = useState<string>('');
@@ -55,9 +55,8 @@ const Index = () => {
     <>
     <div className="min-h-screen min-h-dvh flex flex-col md:flex-row">
 
-   
+      
         
-
 
       {/* Faixa topo — só mobile */}
       <div
@@ -181,7 +180,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="dashboard" className="mt-0">
-              <ErrorDashboard result={result} fileName={fileName} />
+              <ErrorDashboard result={result} fileName={fileName} fileTypeLabel={fileType ? FILE_TYPES[fileType]?.label ?? '' : ''} />
             </TabsContent>
           </Tabs>
 

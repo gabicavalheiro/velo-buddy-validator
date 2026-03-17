@@ -1,4 +1,4 @@
-export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros';
+export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros' | 'stock';
 
 export interface FileTypeConfig {
   label: string;
@@ -8,11 +8,12 @@ export interface FileTypeConfig {
   // Aliases: chave = nome canônico da coluna, valor = lista de nomes alternativos aceites
   columnAliases?: Record<string, string[]>;
   addressColumns?: string[];
-  // Colunas que podem ter zeros à esquerda significativos (CPF, CNPJ, IE, CEST...)
-  // Se estiverem com formatação numérica no Excel, os zeros serão perdidos na importação.
-  leadingZeroColumns?: string[];
   // Colunas onde cada linha deve ter um valor preenchido (obrigatoriedade a nível de célula)
   requiredValueColumns?: string[];
+  // Colunas que exigem formatação Texto no Excel — zeros à esquerda significativos (CPF, CNPJ, IE, CEST…)
+  leadingZeroColumns?: string[];
+  // Nome canônico da coluna de unidade (ex: 'Unidade') para validação cruzada com 'stock'
+  unitColumn?: string;
 }
 
 export const FILE_TYPES: Record<string, FileTypeConfig> = {
@@ -55,7 +56,9 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     cellRules: {
       'Código': 'numbers',
       'CEST': 'numbers',
-      'Qtd. Estoque': 'numbers',
+      'NCM': 'numbers',
+      'CSOSN': 'numbers',
+      'Qtd. Estoque': 'stock',
       'Preço Custo': 'currency',
       'Preço Venda': 'currency',
       'Data Cadastro': 'date',
@@ -64,15 +67,19 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Balança': 'binary',
     },
     leadingZeroColumns: ['CEST'],
+    unitColumn: 'Unidade',
     columnAliases: {
       'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo'],
       'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto'],
       'CEST':                 ['cest', 'Cest'],
+      'NCM':                  ['ncm', 'Ncm', 'Codigo NCM', 'Cod NCM'],
+      'CSOSN':                ['csosn', 'Csosn', 'CRT', 'crt'],
       'Qtd. Estoque':         ['Qtd Estoque', 'Quantidade', 'Estoque', 'Qtd'],
       'Preço Custo':          ['Preco Custo', 'Custo', 'preco_custo'],
       'Preço Venda':          ['Preco Venda', 'Venda', 'preco_venda'],
       'Data Cadastro':        ['Dt Cadastro', 'Data de Cadastro'],
       'Validade':             ['Dt Validade', 'Data Validade', 'Vencimento'],
+      'Unidade':              ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
       'Ativo':                ['ativo', 'Status'],
       'Balança':              ['Balanca', 'balanca'],
     },
@@ -82,18 +89,26 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     skipRows: 0,
     requiredColumns: ['ProdutoId', 'EmpresaId'],
     cellRules: {
-      'ProdutoId': 'numbers',
-      'EmpresaId': 'numbers',
-      'Qtd': 'numbers',
+      'ProdutoId':  'numbers',
+      'EmpresaId':  'numbers',
+      'Qtd':        'stock',
+      'Estoque':    'stock',
       'PrecoCusto': 'currency',
       'PrecoVenda': 'currency',
+      'Margem':     'currency',
+      'Desconto':   'currency',
     },
+    unitColumn: 'Unidade',
     columnAliases: {
-      'ProdutoId':  ['Produto Id', 'produto_id', 'ID Produto'],
-      'EmpresaId':  ['Empresa Id', 'empresa_id', 'ID Empresa'],
-      'Qtd':        ['Quantidade', 'Qtd.', 'qtd'],
-      'PrecoCusto': ['Preço Custo', 'Preco Custo', 'preco_custo'],
-      'PrecoVenda': ['Preço Venda', 'Preco Venda', 'preco_venda'],
+      'ProdutoId':  ['Produto Id', 'produto_id', 'ID Produto', 'PessoaId', 'Codigo Produto', 'CodigoProduto'],
+      'EmpresaId':  ['Empresa Id', 'empresa_id', 'ID Empresa', 'Codigo Empresa', 'CodigoEmpresa'],
+      'Qtd':        ['Quantidade', 'Qtd.', 'qtd', 'Qtd Estoque', 'QTD'],
+      'Estoque':    ['Saldo Estoque', 'Saldo', 'Estoque Atual'],
+      'PrecoCusto': ['Preço Custo', 'Preco Custo', 'preco_custo', 'Custo'],
+      'PrecoVenda': ['Preço Venda', 'Preco Venda', 'preco_venda', 'Venda', 'Preco de Venda', 'Preço de Venda'],
+      'Margem':     ['Margem (%)', 'Margem Lucro', 'margem'],
+      'Desconto':   ['Desconto (%)', 'Desc', 'desconto'],
+      'Unidade':    ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
     },
   },
   contasPagar: {
@@ -113,8 +128,8 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Data de Vencimento': 'date',
     },
     columnAliases: {
-      'Código da Pessoa':   ['Cod Pessoa', 'CodPessoa', 'ID Pessoa'],
-      'Código da Empresa':  ['Cod Empresa', 'CodEmpresa', 'ID Empresa'],
+      'Código da Pessoa':   ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa':  ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
       'Valor':              ['Valor Total', 'Vl Total', 'Vl.'],
       'Carência':           ['Carencia', 'Dias Carência', 'Dias Carencia'],
       'Juros':              ['Juros (%)', 'Taxa Juros', 'Juro'],
@@ -143,8 +158,8 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Recebimento':       'date',
     },
     columnAliases: {
-      'Código da Pessoa':  ['Cod Pessoa', 'CodPessoa', 'ID Pessoa'],
-      'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa'],
+      'Código da Pessoa':  ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
       'Valor em Aberto':   ['Vl Aberto', 'Saldo', 'Valor Aberto'],
       'Valor Quitado':     ['Vl Quitado', 'Quitado', 'Valor Pago'],
       'Carência':          ['Carencia', 'Dias Carência', 'Dias Carencia'],
@@ -205,5 +220,15 @@ export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; labe
       return true;
     },
     label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
+  },
+  // Quantidade de estoque: inteiro positivo ou negativo.
+  // Quando UNIDADE = KG, aceita decimal — a validação cruzada é feita em validateFile.ts.
+  stock: {
+    test: (val: string) => {
+      const trimmed = val.trim();
+      const num = Number(trimmed);
+      return Number.isFinite(num) && Number.isInteger(num);
+    },
+    label: 'Quantidade (inteiro, pode ser negativo)',
   },
 };

@@ -29,8 +29,6 @@ export interface ValidationResult {
 export const NUMBER_AS_TEXT_LABEL =
   'Número armazenado como texto — altere a formatação da célula para "Número" ou "Geral"';
 
-export const LEADING_ZERO_LABEL =
-  'Formatação numérica pode remover zeros à esquerda — altere para "Texto" antes de importar';
 
 export const DATE_AS_SERIAL_LABEL =
   'Data em formato de data do Excel — a coluna deve estar em formato "Texto" com o valor AAAA-MM-DD (ex: 2024-12-31)';
@@ -41,6 +39,9 @@ export const INSTRUCTION_ROW_LABEL = 'A linha 2 parece conter instruções de pr
 
 export const JUROS_RULE_LABEL =
   'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral';
+
+export const LEADING_ZERO_LABEL =
+  'Esta coluna deve estar formatada como "Texto" no Excel — valores numéricos perdem os zeros à esquerda (ex: CPF "04652781407" vira "4652781407")';
 
 export const DATE_WRONG_FORMAT_LABEL =
   'Data em formato incorreto — use o formato AAAA-MM-DD (ex: 2024-12-31). Altere a célula para "Texto" e redigite';
@@ -168,7 +169,6 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   const rows = rawRows.slice(0, lastFilledIdx + 1);
 
   const colIndexMap = resolveColumnIndices(headerRow, config);
-  const leadingZeroCols = new Set(config.leadingZeroColumns ?? []);
 
   // Detecção de linha de instruções (linha 2 com texto descritivo longo)
   // Sinal: a maioria das células da primeira linha de dados contém texto longo (>40 chars)
@@ -213,6 +213,11 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   // Validação de células
   const cellErrors: CellError[] = [];
 
+  // Resolve índice da coluna de unidade (para validação cruzada de estoque com KG)
+  const leadingZeroCols = new Set(config.leadingZeroColumns ?? []);
+  const unitColIdx = config.unitColumn ? colIndexMap.get(config.unitColumn) : undefined;
+  const KG_ALIASES = new Set(['kg', 'kilo', 'quilograma', 'quilogramas', 'kilograma', 'kilogramas']);
+
   for (const [colName, rule] of Object.entries(config.cellRules)) {
     const colIdx = colIndexMap.get(colName);
     if (colIdx === undefined) continue;
@@ -223,8 +228,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
 
     let textFailCount = 0;
     const textDetails: CellErrorDetail[] = [];
-
-    let leadingZeroCount = 0;
+    let leadingZeroFailCount = 0;
     const leadingZeroDetails: CellErrorDetail[] = [];
 
     // Datas armazenadas como serial do Excel (typeof number na coluna date)
@@ -234,7 +238,8 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     let dateWrongFormatCount = 0;
     const dateWrongFormatDetails: CellErrorDetail[] = [];
 
-    const isLeadingZeroSensitive = leadingZeroCols.has(colName);
+    // Calculado uma vez por coluna — não muda entre linhas
+    const isLeadingZero = leadingZeroCols.has(colName);
 
     for (let i = 0; i < rows.length; i++) {
       const rawVal = rows[i][colIdx];
@@ -243,69 +248,60 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       if (cellVal === '') continue;
       totalCount++;
 
-      // Data armazenada como número serial do Excel (ex: 44196 = 31/12/2020 ou 2020-12-31).
-      // Independente do formato visual no Excel, o valor é um número — precisa estar como texto AAAA-MM-DD.
+      // Data armazenada como número serial do Excel
       if (rule === 'date' && typeof rawVal === 'number') {
         dateSerialCount++;
         dateSerialDetails.push({
           row: i + 2 + config.skipRows,
-          value: excelSerialToDateString(rawVal as number), // mostra o valor legível no relatório
+          value: excelSerialToDateString(rawVal as number),
         });
         continue;
       }
 
-      // Zeros à esquerda em risco
-      if (isLeadingZeroSensitive && typeof rawVal === 'number') {
-        leadingZeroCount++;
-        leadingZeroDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
+      // ─── LEADING ZERO: coluna deve estar como Texto ────────────────────────────
+      // Se isLeadingZero e rawVal é number → zeros perdidos → erro de formatação
+      // Se isLeadingZero e rawVal é string → correto, valida conteúdo normalmente
+      if (isLeadingZero) {
+        if (typeof rawVal === 'number') {
+          leadingZeroFailCount++;
+          leadingZeroDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
+          continue;
+        }
+        // string → formato correto, valida conteúdo e continua
+        if (!validator.test(cellVal)) {
+          failCount++;
+          details.push({ row: i + 2 + config.skipRows, value: cellVal });
+        }
         continue;
       }
 
-      // Número armazenado como texto (triângulo verde no Excel)
-      //
-      // EXCEÇÃO — leadingZeroColumns (CPF/CNPJ, IE, CEST):
-      //   Se o valor está como string, os zeros à esquerda estão PRESERVADOS — isso é correto.
-      //   NÃO flageia como "número como texto": o conselho "mudar para Número/Geral" destruiria os zeros.
-      //   Deixa validar normalmente: "04652781407" como string passa no validator 'numbers'.
-      //
-      // 'numbers': string sem ser leadingZero = triângulo verde → precisa ser número
-      // 'currency': string = triângulo verde → precisa ser número
-      // 'juros': string com vírgula ("10,50") = formato correto → valida normalmente
-      //          string sem vírgula ("10", "10.5") = armazenado como texto → flag
-      if (typeof rawVal === 'string') {
-        if (rule === 'numbers') {
-          if (isLeadingZeroSensitive) {
-            // Zeros preservados como texto — valida conteúdo normalmente, não é erro de formatação
-            if (!validator.test(cellVal)) {
-              failCount++;
-              details.push({ row: i + 2 + config.skipRows, value: cellVal });
-            }
-            continue;
-          }
-          // Coluna numérica normal como string = triângulo verde
-          textFailCount++;
-          textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
-          continue;
+      // ─── NÚMERO ARMAZENADO COMO TEXTO ───────────────────────────────────────────
+      if (typeof rawVal === 'string' && rule !== 'date') {
+        textFailCount++;
+        textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
+        continue;
+      }
+
+      // ─── VALIDAÇÃO CRUZADA: stock + UNIDADE = KG → aceita decimal ───────────────
+      if (rule === 'stock') {
+        const unitVal = unitColIdx !== undefined
+          ? String(rows[i][unitColIdx] ?? '').trim().toLowerCase()
+          : '';
+        const isKg = KG_ALIASES.has(unitVal);
+        const num = Number(cellVal);
+        if (!Number.isFinite(num)) {
+          failCount++;
+          details.push({ row: i + 2 + config.skipRows, value: cellVal });
+        } else if (!isKg && !Number.isInteger(num)) {
+          // Não é KG e tem decimal → erro
+          failCount++;
+          details.push({ row: i + 2 + config.skipRows, value: cellVal });
         }
-        if (rule === 'currency') {
-          // Currency como string = triângulo verde
-          textFailCount++;
-          textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
-          continue;
-        }
-        if (rule === 'juros') {
-          // Sem vírgula = número puro armazenado como texto
-          if (/^\d+(\.\d+)?$/.test(cellVal)) {
-            textFailCount++;
-            textDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
-            continue;
-          }
-          // Com vírgula ("10,50") = formato correto, valida normalmente
-        }
+        // isKg + decimal → OK; qualquer inteiro (positivo/negativo) → OK
+        continue;
       }
 
       if (!validator.test(cellVal)) {
-        // Data como texto mas formato errado (ex: 31/12/2020, 2020/12/31)
         if (rule === 'date') {
           dateWrongFormatCount++;
           dateWrongFormatDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
@@ -322,8 +318,9 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     if (textFailCount > 0)
       cellErrors.push({ column: colName, rule, ruleLabel: NUMBER_AS_TEXT_LABEL, failCount: textFailCount, totalCount, details: textDetails });
 
-    if (leadingZeroCount > 0)
-      cellErrors.push({ column: colName, rule, ruleLabel: LEADING_ZERO_LABEL, failCount: leadingZeroCount, totalCount, details: leadingZeroDetails });
+    if (leadingZeroFailCount > 0)
+      cellErrors.push({ column: colName, rule, ruleLabel: LEADING_ZERO_LABEL, failCount: leadingZeroFailCount, totalCount, details: leadingZeroDetails });
+
 
     // Data como serial — rejeitada: precisa estar como texto AAAA-MM-DD
     if (dateSerialCount > 0)
@@ -332,6 +329,53 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     // Data como texto mas formato errado (ex: 31/12/2020)
     if (dateWrongFormatCount > 0)
       cellErrors.push({ column: colName, rule, ruleLabel: DATE_WRONG_FORMAT_LABEL, failCount: dateWrongFormatCount, totalCount, details: dateWrongFormatDetails });
+  }
+
+
+  // ─── VARREDURA UNIVERSAL: número armazenado como texto ──────────────────────
+  // Itera TODAS as colunas da planilha, incluindo as que não estão em cellRules
+  // ou cujo nome não foi resolvido pelo alias. Se qualquer célula não-data for
+  // typeof 'string' E parecer número (dígitos, vírgula/ponto decimal), é erro.
+  // Colunas já analisadas em cellRules são ignoradas para não duplicar erros.
+  {
+    // Skip cellRules columns AND leadingZero columns (they have their own logic above)
+    const alreadyChecked = new Set([
+      ...Object.keys(config.cellRules)
+        .map((name) => colIndexMap.get(name))
+        .filter((idx): idx is number => idx !== undefined),
+      ...(config.leadingZeroColumns ?? [])
+        .map((name) => colIndexMap.get(name))
+        .filter((idx): idx is number => idx !== undefined),
+    ]);
+
+    const looksNumeric = (v: string) =>
+      /^-?\d+([.,]\d+)?$/.test(v.trim());
+
+    for (let colIdx = 0; colIdx < headerRow.length; colIdx++) {
+      if (alreadyChecked.has(colIdx)) continue;
+
+      const colLabel = headerRow[colIdx] || `Coluna ${colIdx + 1}`;
+      const textDetails: CellErrorDetail[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const rawVal = rows[i][colIdx];
+        if (rawVal === '' || rawVal === null || rawVal === undefined) continue;
+        if (typeof rawVal === 'string' && looksNumeric(rawVal)) {
+          textDetails.push({ row: i + 2 + config.skipRows, value: rawVal.trim() });
+        }
+      }
+
+      if (textDetails.length > 0) {
+        cellErrors.push({
+          column: colLabel,
+          rule: 'numbers',
+          ruleLabel: NUMBER_AS_TEXT_LABEL,
+          failCount: textDetails.length,
+          totalCount: rows.length,
+          details: textDetails,
+        });
+      }
+    }
   }
 
   // Colunas com valor obrigatório por linha
