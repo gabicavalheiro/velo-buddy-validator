@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
 import type { CellRule } from '@/lib/validationRules';
-import { NUMBER_AS_TEXT_LABEL, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL } from '@/lib/validateFile';
+import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL } from '@/lib/validateFile';
 
 interface HelpModalProps {
   open: boolean;
@@ -187,7 +187,7 @@ function getConfig(errorType: string, rule: CellRule): Config {
     return {
       steps: stepsDate,
       title: 'Como corrigir: Data em formato errado',
-      description: 'A coluna está formatada como Data no Excel. O sistema exige texto no padrão AAAA-MM-DD (ex: 2024-12-31). Siga os passos:',
+      description: 'A coluna está com formato de Data do Excel. Precisa estar no padrão AAAA-MM-DD (ex: 2024-12-31). Siga os passos para converter:',
       tip: 'O formato YYYY-MM-DD com localidade Inglês (EUA) garante que o Excel exporte as datas no padrão exigido pelo Velo.',
     };
   }
@@ -195,7 +195,7 @@ function getConfig(errorType: string, rule: CellRule): Config {
     return {
       steps: stepsDateWrongFormat,
       title: 'Como corrigir: Formato de data inválido',
-      description: 'A data está como texto mas no formato incorreto (ex: 31/12/2020). O sistema exige AAAA-MM-DD. Siga os passos:',
+      description: 'A data está num formato inválido (ex: 31/12/2020 ou 2020/12/31). O padrão exigido é AAAA-MM-DD (ex: 2024-12-31). Siga os passos:',
       tip: 'Ao formatar a célula como Texto antes de digitar, o Excel não converterá automaticamente o valor.',
     };
   }

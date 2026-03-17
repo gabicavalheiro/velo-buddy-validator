@@ -4,7 +4,7 @@ import { X, Copy, Check, MessageSquare } from 'lucide-react';
 import type { CellRule } from '@/lib/validationRules';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
 import {
-  NUMBER_AS_TEXT_LABEL,
+  NUMBER_AS_TEXT_PREFIX,
   LEADING_ZERO_LABEL,
   DATE_AS_SERIAL_LABEL,
   DATE_WRONG_FORMAT_LABEL,
@@ -37,7 +37,7 @@ function finalFormatPath(rule: CellRule): string {
   switch (rule) {
     case 'currency': return 'Página Inicial → Número → Moeda';
     case 'stock':
-    case 'numbers':  return 'Página Inicial → Número → Número';
+    case 'numbers':  return 'Página Inicial → Número → Geral';
     default:         return 'Página Inicial → Número → Geral';
   }
 }
@@ -59,7 +59,7 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
 
   lines.push('Olá! 😊');
   lines.push('');
-  lines.push(`Validamos a planilha *${fileName}* (${fileTypeLabel}) e encontramos alguns pontos que precisam ser corrigidos antes da importação:`);
+  lines.push(`Planilha *${fileName}* (${fileTypeLabel}) — encontramos os seguintes pontos para corrigir:`);
   lines.push('');
 
   // Linha de instruções
@@ -84,7 +84,7 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     const ruleLabel = key.split('||')[0];
     const colList = cols.map(c => `*${c}*`).join(', ');
 
-    if (ruleLabel === NUMBER_AS_TEXT_LABEL) {
+    if (ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX)) {
       const fmt = finalFormatLabel(rule);
       const path = finalFormatPath(rule);
       lines.push('🔢 *Número armazenado como texto*');
@@ -109,7 +109,7 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     } else if (ruleLabel === DATE_AS_SERIAL_LABEL) {
       lines.push('📅 *Data em formato de data do Excel*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('As datas precisam estar como texto no padrão *AAAA-MM-DD* (ex: 2024-12-31). Para corrigir:');
+      lines.push('As datas precisam estar no formato *AAAA-MM-DD* (ex: 2024-12-31). Para corrigir:');
       lines.push('  1. Selecione a(s) coluna(s)');
       lines.push('  2. Vá em *Página Inicial → Mais Formatos de Número*');
       lines.push('  3. Em "Número → Data", mude a localidade para *Inglês (Estados Unidos)*');
@@ -119,7 +119,7 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     } else if (ruleLabel === DATE_WRONG_FORMAT_LABEL) {
       lines.push('📅 *Formato de data incorreto*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('As datas estão num formato inválido (ex: 31/12/2024 ou 2024/12/31). O sistema exige *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos de formatação de data acima.');
+      lines.push('As datas estão num formato inválido (ex: 31/12/2024). O padrão exigido é *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos acima.');
       lines.push('');
 
     } else if (ruleLabel === JUROS_RULE_LABEL) {
@@ -134,12 +134,23 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push('Existem linhas sem preenchimento nessa(s) coluna(s) obrigatória(s). Por favor, preencha todos os campos.');
       lines.push('');
 
+    } else if (ruleLabel.toLowerCase().includes('morada')) {
+      lines.push('🏠 *REGRA DE ENDEREÇO — ATENÇÃO*');
+      lines.push('');
+      lines.push('Uma vez que *qualquer* campo de endereço for preenchido, *TODOS* os campos se tornam obrigatórios:');
+      lines.push('');
+      lines.push('👉 *CEP* | *LOGRADOURO* | *NÚMERO* | *COMPLEMENTO* | *BAIRRO* | *REFERÊNCIA* | *CIDADE* | *ESTADO*');
+      lines.push('');
+      lines.push(`Nas linhas com erro (campo(s) vazio(s): ${colList}), preencha *todos* os campos acima ou deixe *todos* em branco.`);
+      lines.push('Não é permitido preencher apenas alguns campos de endereço.');
+      lines.push('');
+
     } else {
-      // Erros genéricos de formato (binary, stock, numbers fora do padrão, etc.)
+      // Erros genéricos
       const fmt = finalFormatLabel(rule);
-      lines.push(`❌ *Valor inválido*`);
+      lines.push(`❌ *Valor inválido — ${fmt}*`);
       lines.push(`Coluna(s): ${colList}`);
-      lines.push(`Formato esperado: *${fmt}*. Verifique os valores dessas colunas e ajuste a formatação das células em *${finalFormatPath(rule)}*.`);
+      lines.push(`Verifique os valores e aplique o formato correto: *${finalFormatPath(rule)}*.`);
       lines.push('');
     }
   }

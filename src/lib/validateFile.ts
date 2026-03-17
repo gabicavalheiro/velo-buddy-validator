@@ -29,9 +29,12 @@ export interface ValidationResult {
 export const NUMBER_AS_TEXT_LABEL =
   'Número armazenado como texto — altere a formatação da célula para "Número" ou "Geral"';
 
+// Prefixo comum a todos os labels de número-como-texto (para detecção em componentes)
+export const NUMBER_AS_TEXT_PREFIX = 'Número armazenado como texto';
+
 
 export const DATE_AS_SERIAL_LABEL =
-  'Data em formato de data do Excel — a coluna deve estar em formato "Texto" com o valor AAAA-MM-DD (ex: 2024-12-31)';
+  'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 
 export const REQUIRED_VALUE_LABEL = 'Campo obrigatório — esta coluna não pode ter linhas em branco';
 
@@ -44,7 +47,7 @@ export const LEADING_ZERO_LABEL =
   'Esta coluna deve estar formatada como "Texto" no Excel — valores numéricos perdem os zeros à esquerda (ex: CPF "04652781407" vira "4652781407")';
 
 export const DATE_WRONG_FORMAT_LABEL =
-  'Data em formato incorreto — use o formato AAAA-MM-DD (ex: 2024-12-31). Altere a célula para "Texto" e redigite';
+  'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 
 export function parseFile(file: File): Promise<XLSX.WorkBook> {
   return new Promise((resolve, reject) => {
@@ -137,6 +140,27 @@ function resolveColumnIndices(
   }
 
   return result;
+}
+
+
+/**
+ * Retorna o label de "número como texto" específico para cada tipo de coluna,
+ * indicando o formato final correto que o utilizador deve aplicar após converter.
+ */
+function numberAsTextLabel(rule: CellRule): string {
+  switch (rule) {
+    case 'currency':
+      return 'Número armazenado como texto — converta para Número e aplique o formato "Moeda"';
+    case 'stock':
+      return 'Número armazenado como texto — converta para Número e aplique o formato "Número" (inteiros, pode ser negativo)';
+    case 'juros':
+      return 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (ex: 10,50)';
+    case 'binary':
+      return 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (apenas 0 ou 1)';
+    case 'numbers':
+    default:
+      return 'Número armazenado como texto — converta para Número e aplique o formato "Geral"';
+  }
 }
 
 export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig): ValidationResult {
@@ -263,15 +287,12 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       // Se isLeadingZero e rawVal é string → correto, valida conteúdo normalmente
       if (isLeadingZero) {
         if (typeof rawVal === 'number') {
+          // Número → zeros à esquerda perdidos
           leadingZeroFailCount++;
           leadingZeroDetails.push({ row: i + 2 + config.skipRows, value: cellVal });
-          continue;
         }
-        // string → formato correto, valida conteúdo e continua
-        if (!validator.test(cellVal)) {
-          failCount++;
-          details.push({ row: i + 2 + config.skipRows, value: cellVal });
-        }
+        // String (Texto) → formato correto, não gera nenhum outro erro
+        // Não validamos conteúdo aqui: CPF/CNPJ/IE podem ter pontos e traços
         continue;
       }
 
@@ -316,7 +337,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       cellErrors.push({ column: colName, rule, ruleLabel: validator.label, failCount, totalCount, details });
 
     if (textFailCount > 0)
-      cellErrors.push({ column: colName, rule, ruleLabel: NUMBER_AS_TEXT_LABEL, failCount: textFailCount, totalCount, details: textDetails });
+      cellErrors.push({ column: colName, rule, ruleLabel: numberAsTextLabel(rule), failCount: textFailCount, totalCount, details: textDetails });
 
     if (leadingZeroFailCount > 0)
       cellErrors.push({ column: colName, rule, ruleLabel: LEADING_ZERO_LABEL, failCount: leadingZeroFailCount, totalCount, details: leadingZeroDetails });
@@ -369,7 +390,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
         cellErrors.push({
           column: colLabel,
           rule: 'numbers',
-          ruleLabel: NUMBER_AS_TEXT_LABEL,
+          ruleLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral"',
           failCount: textDetails.length,
           totalCount: rows.length,
           details: textDetails,

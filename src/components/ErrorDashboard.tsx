@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare } from 'lucide-react';
+import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare, MapPin } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
-import { NUMBER_AS_TEXT_LABEL, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
-import HelpModal from './HelpModal.tsx';
-import ClientMessageModal from './Clientmessagemodal.tsx';
+import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
+import HelpModal from './HelpModal';
+import ClientMessageModal from './ClientMessagemodal.tsx';
 
 interface Props {
   result: ValidationResult | null;
@@ -17,7 +17,7 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const maxPreview = 100;
 
-  const isNumberAsText = error.ruleLabel === NUMBER_AS_TEXT_LABEL;
+  const isNumberAsText = error.ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX);
   const isDateSerial = error.ruleLabel === DATE_AS_SERIAL_LABEL;
   const isDateWrongFormat = error.ruleLabel === DATE_WRONG_FORMAT_LABEL;
   const isJurosRule = error.ruleLabel === JUROS_RULE_LABEL;
@@ -216,6 +216,45 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
           </motion.div>
         );
       })()}
+
+
+      {/* Endereço incompleto — card explicativo */}
+      {result.cellErrors.some(e => e.column.includes('morada')) && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl overflow-hidden border-2"
+          style={{ borderColor: 'hsl(18 90% 52%)' }}
+        >
+          {/* Header */}
+          <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: 'hsl(18 90% 52%)' }}>
+            <MapPin className="h-4 w-4 text-white shrink-0" />
+            <p className="font-bold text-sm text-white tracking-wide">⚠️ REGRA DE ENDEREÇO — LEIA COM ATENÇÃO</p>
+          </div>
+          {/* Body */}
+          <div className="px-4 py-3 space-y-3" style={{ background: 'hsl(18 90% 52% / 0.06)' }}>
+            <p className="text-sm font-semibold text-foreground leading-relaxed">
+              Uma vez que <strong>qualquer campo de endereço</strong> for preenchido,{' '}
+              <span style={{ color: 'hsl(18 80% 40%)' }}>TODOS os campos se tornam obrigatórios</span> naquela linha.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {['CEP', 'LOGRADOURO', 'NÚMERO', 'COMPLEMENTO', 'BAIRRO', 'REFERÊNCIA', 'CIDADE', 'ESTADO'].map(field => (
+                <div
+                  key={field}
+                  className="rounded-lg px-2.5 py-1.5 text-center text-xs font-bold"
+                  style={{ background: 'hsl(18 90% 52%)', color: 'white' }}
+                >
+                  {field}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Preencha <strong>todos os campos acima</strong> nas linhas afetadas, ou deixe <strong>todos em branco</strong>.
+              Não é permitido preencher apenas alguns.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
