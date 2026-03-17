@@ -1,3 +1,4 @@
+// Componente que apresenta o resultado global da validação, com estados de sucesso e listagem de erros por coluna/célula.
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp } from 'lucide-react';

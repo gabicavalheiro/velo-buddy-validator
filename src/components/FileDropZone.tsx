@@ -1,3 +1,4 @@
+// Componente de upload que permite arrastar ou selecionar ficheiros (.csv/.xlsx/.xls) e devolve o ficheiro escolhido.
 import { useState, useCallback, useRef } from 'react';
 import { Upload, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

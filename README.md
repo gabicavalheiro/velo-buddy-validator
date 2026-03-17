@@ -228,4 +228,8 @@ npm run build
 - **Tailwind CSS** — estilização
 - **shadcn/ui** — componentes base
 - **Lucide React** — ícones
+<<<<<<< HEAD
 - **canvas-confetti** — celebração ao validar com sucesso
+=======
+- **canvas-confetti** — celebração ao validar com sucesso
+>>>>>>> readme-pt-221c1

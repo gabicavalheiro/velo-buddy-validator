@@ -1,3 +1,4 @@
+// Configuração base dos testes (ambiente, mocks globais e utilidades comuns).
 import "@testing-library/jest-dom";
 
 Object.defineProperty(window, "matchMedia", {

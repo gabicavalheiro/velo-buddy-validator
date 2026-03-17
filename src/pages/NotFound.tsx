@@ -1,3 +1,4 @@
+// Página exibida quando o utilizador navega para uma rota que não existe (404).
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
