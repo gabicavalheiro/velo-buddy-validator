@@ -1,53 +1,64 @@
-export type CellRule =
-  | 'numbers'
-  | 'decimal'
-  | 'date'
-  | 'currency'
-  | 'binary'
-  | 'text_id'
-  | 'text_flexible';
+export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros' | 'stock';
 
 export interface FileTypeConfig {
   label: string;
   skipRows: number;
   requiredColumns: string[];
   cellRules: Record<string, CellRule>;
+  // Aliases: chave = nome canônico da coluna, valor = lista de nomes alternativos aceites
+  columnAliases?: Record<string, string[]>;
   addressColumns?: string[];
+  // Colunas onde cada linha deve ter um valor preenchido (obrigatoriedade a nível de célula)
+  requiredValueColumns?: string[];
+  // Colunas que exigem formatação Texto no Excel — zeros à esquerda significativos (CPF, CNPJ, IE, CEST…)
+  leadingZeroColumns?: string[];
+  // Nome canônico da coluna de unidade (ex: 'Unidade') para validação cruzada com 'stock'
+  unitColumn?: string;
 }
 
 export const FILE_TYPES: Record<string, FileTypeConfig> = {
   clientes: {
     label: 'Clientes e Fornecedores',
-    skipRows: 7,
+    skipRows: 0,
     requiredColumns: ['Código', 'Nome/Razão Social', 'I.E', 'Simples Nacional', 'Cliente', 'Fornecedor'],
     cellRules: {
       'Código': 'numbers',
-      // Tratado como TEXTO para preservar zeros à esquerda (ex: 000.123.456-09)
-      'CPF/CNPJ': 'text_id',
-      'Telefone': 'text_id',
-      'Celular': 'text_id',
+      'CPF/CNPJ': 'numbers',
+      'I.E': 'numbers',
+      'Telefone': 'numbers',
+      'Celular': 'numbers',
       'Data Nascimento/Fundação': 'date',
       'Data Cadastro': 'date',
       'Simples Nacional': 'binary',
       'Cliente': 'binary',
       'Fornecedor': 'binary',
     },
-    // Endereço incompleto gera ALERTA (não erro) — sistema importa para Observações
+    leadingZeroColumns: ['CPF/CNPJ', 'I.E'],
+    columnAliases: {
+      'Código':                   ['Cod', 'Cod.', 'codigo', 'Codigo'],
+      'Nome/Razão Social':        ['Nome', 'Razão Social', 'Razao Social', 'nome'],
+      'I.E':                      ['I.E.', 'IE', 'Inscrição Estadual', 'Inscricao Estadual', 'CNH', 'CNH/IE'],
+      'CPF/CNPJ':                 ['CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj', 'Cpf/Cnpj'],
+      'Telefone':                 ['Tel', 'Tel.', 'Fone', 'telefone'],
+      'Celular':                  ['Cel', 'Cel.', 'celular', 'WhatsApp'],
+      'Data Nascimento/Fundação': ['Data Nascimento', 'Data Fundação', 'Nascimento', 'Fundação'],
+      'Data Cadastro':            ['Dt Cadastro', 'Data de Cadastro'],
+      'Simples Nacional':         ['Simples', 'SN'],
+      'Cliente':                  ['cliente', 'cli'],
+      'Fornecedor':               ['fornecedor', 'forn'],
+    },
     addressColumns: ['CEP', 'Logradouro', 'Número', 'Bairro', 'Cidade', 'Estado', 'País'],
   },
-
   produtoSimples: {
     label: 'Produto Simples',
-    skipRows: 6,
+    skipRows: 0,
     requiredColumns: ['Código', 'Descrição do produto', 'Preço Venda', 'Ativo'],
     cellRules: {
       'Código': 'numbers',
-      // NCM: 8 dígitos com zeros à esquerda — NÃO pode virar número (ex: 01012100)
-      'NCM': 'text_id',
-      // EAN/GTIN pode começar com 0 — NÃO pode virar número
-      'Código de Barras': 'text_id',
-      // Aceita fracionado: clientes que vendem por peso/medida (ex: 1.5 kg, 0,750 L)
-      'Qtd. Estoque': 'decimal',
+      'CEST': 'numbers',
+      'NCM': 'numbers',
+      'CSOSN': 'numbers',
+      'Qtd. Estoque': 'stock',
       'Preço Custo': 'currency',
       'Preço Venda': 'currency',
       'Data Cadastro': 'date',
@@ -55,86 +66,169 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Ativo': 'binary',
       'Balança': 'binary',
     },
+    leadingZeroColumns: ['CEST'],
+    unitColumn: 'Unidade',
+    columnAliases: {
+      'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo'],
+      'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto'],
+      'CEST':                 ['cest', 'Cest'],
+      'NCM':                  ['ncm', 'Ncm', 'Codigo NCM', 'Cod NCM'],
+      'CSOSN':                ['csosn', 'Csosn', 'CRT', 'crt'],
+      'Qtd. Estoque':         ['Qtd Estoque', 'Quantidade', 'Estoque', 'Qtd'],
+      'Preço Custo':          ['Preco Custo', 'Custo', 'preco_custo'],
+      'Preço Venda':          ['Preco Venda', 'Venda', 'preco_venda'],
+      'Data Cadastro':        ['Dt Cadastro', 'Data de Cadastro'],
+      'Validade':             ['Dt Validade', 'Data Validade', 'Vencimento'],
+      'Unidade':              ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
+      'Ativo':                ['ativo', 'Status'],
+      'Balança':              ['Balanca', 'balanca'],
+    },
   },
-
   produtoGrade: {
     label: 'Produtos de Grade',
-    skipRows: 5,
+    skipRows: 0,
     requiredColumns: ['ProdutoId', 'EmpresaId'],
     cellRules: {
-      'ProdutoId': 'numbers',
-      'EmpresaId': 'numbers',
-      'Qtd': 'decimal',
+      'ProdutoId':  'numbers',
+      'EmpresaId':  'numbers',
+      'Qtd':        'stock',
+      'Estoque':    'stock',
       'PrecoCusto': 'currency',
       'PrecoVenda': 'currency',
+      'Margem':     'currency',
+      'Desconto':   'currency',
+    },
+    unitColumn: 'Unidade',
+    columnAliases: {
+      'ProdutoId':  ['Produto Id', 'produto_id', 'ID Produto', 'PessoaId', 'Codigo Produto', 'CodigoProduto'],
+      'EmpresaId':  ['Empresa Id', 'empresa_id', 'ID Empresa', 'Codigo Empresa', 'CodigoEmpresa'],
+      'Qtd':        ['Quantidade', 'Qtd.', 'qtd', 'Qtd Estoque', 'QTD'],
+      'Estoque':    ['Saldo Estoque', 'Saldo', 'Estoque Atual'],
+      'PrecoCusto': ['Preço Custo', 'Preco Custo', 'preco_custo', 'Custo'],
+      'PrecoVenda': ['Preço Venda', 'Preco Venda', 'preco_venda', 'Venda', 'Preco de Venda', 'Preço de Venda'],
+      'Margem':     ['Margem (%)', 'Margem Lucro', 'margem'],
+      'Desconto':   ['Desconto (%)', 'Desc', 'desconto'],
+      'Unidade':    ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
     },
   },
-
   contasPagar: {
     label: 'Contas a Pagar',
-    skipRows: 7,
+    skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor'],
+    requiredValueColumns: ['Código da Pessoa', 'Código da Empresa'],
     cellRules: {
-      // Apenas os campos críticos são validados; demais campos aceitos como texto livre
-      'Código da Pessoa': 'numbers',
-      'Código da Empresa': 'numbers',
-      'Valor': 'currency',
-      'Data da Emissão': 'date',
+      'Código da Pessoa':   'numbers',
+      'Código da Empresa':  'numbers',
+      'Valor':              'currency',
+      'Carência':           'numbers',
+      'Juros':              'juros',
+      'Multa':              'juros',
+      'Desconto':           'currency',
+      'Data da Emissão':    'date',
       'Data de Vencimento': 'date',
     },
+    columnAliases: {
+      'Código da Pessoa':   ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa':  ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
+      'Valor':              ['Valor Total', 'Vl Total', 'Vl.'],
+      'Carência':           ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':              ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':              ['Multa (%)', 'Taxa Multa'],
+      'Desconto':           ['Desc', 'Desconto (%)'],
+      'Data da Emissão':    ['Dt Emissão', 'Emissão', 'Data Emissao'],
+      'Data de Vencimento': ['Dt Vencimento', 'Vencimento', 'Dt Venc'],
+    },
   },
-
   contasReceber: {
     label: 'Contas a Receber',
-    skipRows: 9,
+    skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor em Aberto'],
+    requiredValueColumns: ['Código da Pessoa', 'Código da Empresa'],
     cellRules: {
-      'Código da Pessoa': 'numbers',
+      'Código da Pessoa':  'numbers',
       'Código da Empresa': 'numbers',
-      'Valor em Aberto': 'currency',
-      'Valor Quitado': 'currency',
-      'Data de Emissão': 'date',
-      'Vencimento': 'date',
-      'Recebimento': 'date',
+      'Valor em Aberto':   'currency',
+      'Valor Quitado':     'currency',
+      'Carência':          'numbers',
+      'Juros':             'juros',
+      'Multa':             'juros',
+      'Desconto':          'currency',
+      'Data de Emissão':   'date',
+      'Vencimento':        'date',
+      'Recebimento':       'date',
+    },
+    columnAliases: {
+      'Código da Pessoa':  ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
+      'Valor em Aberto':   ['Vl Aberto', 'Saldo', 'Valor Aberto'],
+      'Valor Quitado':     ['Vl Quitado', 'Quitado', 'Valor Pago'],
+      'Carência':          ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':             ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':             ['Multa (%)', 'Taxa Multa'],
+      'Desconto':          ['Desc', 'Desconto (%)'],
+      'Data de Emissão':   ['Dt Emissão', 'Emissão', 'Data Emissao'],
+      'Vencimento':        ['Dt Vencimento', 'Data Vencimento', 'Dt Venc'],
+      'Recebimento':       ['Dt Recebimento', 'Data Recebimento', 'Dt Rec'],
     },
   },
 };
 
+
 export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; label: string }> = {
-  // Apenas inteiros positivos
   numbers: {
-    test: (val: string) => /^\d+$/.test(val.trim()),
+    // Aceita inteiros em qualquer formato do Excel:
+    // - dígitos puros:            "123", "00456" (número armazenado como texto)
+    // - número com ".0" do Excel: "123.0", "456.00" (formatação geral do Excel)
+    test: (val: string) => {
+      const trimmed = val.trim();
+      if (/^\d+$/.test(trimmed)) return true;
+      const num = Number(trimmed);
+      return Number.isFinite(num) && Number.isInteger(num) && num >= 0;
+    },
     label: 'Apenas Números Inteiros',
   },
-  // Inteiro ou decimal (vírgula ou ponto) — ex: 1 | 1.5 | 0,750
-  decimal: {
-    test: (val: string) => /^\d+([.,]\d+)?$/.test(val.trim()),
-    label: 'Número (inteiro ou decimal)',
-  },
-  // Data ISO — funciona mesmo quando Excel lê célula como texto
   date: {
     test: (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val.trim()),
     label: 'Data (AAAA-MM-DD)',
   },
-  // Valor monetário sem símbolo R$
   currency: {
     test: (val: string) => /^\d+([.,]\d+)?$/.test(val.trim()),
-    label: 'Moeda (ex: 1234,56 — sem R$)',
+    label: 'Moeda (sem R$)',
   },
-  // Campo 0 ou 1
   binary: {
     test: (val: string) => /^[01]$/.test(val.trim()),
     label: 'Binário (0 ou 1)',
   },
-  // Identificador textual: dígitos + pontuação — preserva zeros à esquerda
-  // Aceita: "000.123.456-09" | "01012100" | "0789462130045" | "(051)99999-9999"
-  text_id: {
-    test: (val: string) => /^[\d.\-\/\(\)\s]+$/.test(val.trim()),
-    label: 'Identificador Texto (dígitos e pontuação)',
+  // Juros/Multa: número com até 3 dígitos inteiros e até 2 casas decimais, formato GERAL.
+  // Com formato GERAL no Excel brasileiro, "10,50" é salvo como número 10.5 pelo Excel.
+  // O validador aceita ambas as representações:
+  //   - string com vírgula:  "10", "10,5", "10,50", "1,99", "100"  → typed as text or text-formatted
+  //   - número convertido:   "10.5", "10.50", "1.99"               → General format, Excel stored as number
+  // Rejeita: "10,500" (3 decimais), "10,5%" (símbolo), "1000" (>3 dígitos inteiros)
+  juros: {
+    test: (val: string) => {
+      const trimmed = val.trim();
+      // Aceita vírgula (texto digitado) ou ponto (número vindo do Excel General)
+      const normalized = trimmed.replace(',', '.');
+      const num = Number(normalized);
+      if (!Number.isFinite(num) || num < 0) return false;
+      // Até 3 dígitos na parte inteira
+      const [intPart, decPart = ''] = normalized.split('.');
+      if (intPart.length > 3) return false;
+      // Até 2 casas decimais
+      if (decPart.length > 2) return false;
+      return true;
+    },
+    label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
   },
-  // Qualquer texto não-vazio (campos livres em contas)
-  text_flexible: {
-    test: (val: string) => val.trim().length > 0,
-    label: 'Texto (qualquer valor preenchido)',
+  // Quantidade de estoque: inteiro positivo ou negativo.
+  // Quando UNIDADE = KG, aceita decimal — a validação cruzada é feita em validateFile.ts.
+  stock: {
+    test: (val: string) => {
+      const trimmed = val.trim();
+      const num = Number(trimmed);
+      return Number.isFinite(num) && Number.isInteger(num);
+    },
+    label: 'Quantidade (inteiro, pode ser negativo)',
   },
 };
