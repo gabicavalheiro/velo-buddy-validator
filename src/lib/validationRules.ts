@@ -1,18 +1,14 @@
-export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros' | 'stock';
+export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros' | 'stock' | 'text';
 
 export interface FileTypeConfig {
   label: string;
   skipRows: number;
   requiredColumns: string[];
-  cellRules: Record<string, CellRule>;
-  // Aliases: chave = nome canônico da coluna, valor = lista de nomes alternativos aceites
+  cellRules: Record<string, CellRule | CellRule[]>;
   columnAliases?: Record<string, string[]>;
   addressColumns?: string[];
-  // Colunas onde cada linha deve ter um valor preenchido (obrigatoriedade a nível de célula)
   requiredValueColumns?: string[];
-  // Colunas que exigem formatação Texto no Excel — zeros à esquerda significativos (CPF, CNPJ, IE, CEST…)
   leadingZeroColumns?: string[];
-  // Nome canônico da coluna de unidade (ex: 'Unidade') para validação cruzada com 'stock'
   unitColumn?: string;
 }
 
@@ -22,27 +18,27 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     skipRows: 0,
     requiredColumns: ['Código', 'Nome/Razão Social', 'I.E', 'Simples Nacional', 'Cliente', 'Fornecedor'],
     cellRules: {
-      'Código': 'numbers',
-      'CPF/CNPJ': 'numbers',
-      'I.E': 'numbers',
-      'Telefone': 'numbers',
-      'Celular': 'numbers',
+      'Código':                   'numbers',
+      'CPF/CNPJ':                 'text',
+      'I.E':                      'text',
+      'Telefone':                 ['text', 'numbers'],
+      'Celular':                  ['text', 'numbers'],
       'Data Nascimento/Fundação': 'date',
-      'Data Cadastro': 'date',
-      'Simples Nacional': 'binary',
-      'Cliente': 'binary',
-      'Fornecedor': 'binary',
+      'Data Cadastro':            'date',
+      'Simples Nacional':         'binary',
+      'Cliente':                  'binary',
+      'Fornecedor':               'binary',
     },
     leadingZeroColumns: ['CPF/CNPJ', 'I.E'],
     columnAliases: {
-      'Código':                   ['Cod', 'Cod.', 'codigo', 'Codigo'],
-      'Nome/Razão Social':        ['Nome', 'Razão Social', 'Razao Social', 'nome'],
+      'Código':                   ['Cod', 'Cod.', 'codigo', 'Codigo', 'id', 'idpessoa', 'IdPessoa'],
+      'Nome/Razão Social':        ['Nome', 'Razão Social', 'Razao Social', 'nome', 'Descricao'],
       'I.E':                      ['I.E.', 'IE', 'Inscrição Estadual', 'Inscricao Estadual', 'CNH', 'CNH/IE'],
       'CPF/CNPJ':                 ['CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj', 'Cpf/Cnpj'],
       'Telefone':                 ['Tel', 'Tel.', 'Fone', 'telefone'],
       'Celular':                  ['Cel', 'Cel.', 'celular', 'WhatsApp'],
       'Data Nascimento/Fundação': ['Data Nascimento', 'Data Fundação', 'Nascimento', 'Fundação'],
-      'Data Cadastro':            ['Dt Cadastro', 'Data de Cadastro'],
+      'Data Cadastro':            ['Dt Cadastro', 'Data de Cadastro', 'cadastro'],
       'Simples Nacional':         ['Simples', 'SN'],
       'Cliente':                  ['cliente', 'cli'],
       'Fornecedor':               ['fornecedor', 'forn'],
@@ -54,23 +50,23 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     skipRows: 0,
     requiredColumns: ['Código', 'Descrição do produto', 'Preço Venda', 'Ativo'],
     cellRules: {
-      'Código': 'numbers',
-      'CEST': 'numbers',
-      'NCM': 'numbers',
-      'CSOSN': 'numbers',
-      'Qtd. Estoque': 'stock',
-      'Preço Custo': 'currency',
-      'Preço Venda': 'currency',
+      'Código':        'numbers',
+      'CEST':          'text',
+      'NCM':           'text',
+      'CSOSN':         'text',
+      'Qtd. Estoque':  'stock',
+      'Preço Custo':   'currency',
+      'Preço Venda':   'currency',
       'Data Cadastro': 'date',
-      'Validade': 'date',
-      'Ativo': 'binary',
-      'Balança': 'binary',
+      'Validade':      'date',
+      'Ativo':         'binary',
+      'Balança':       'binary',
     },
-    leadingZeroColumns: ['CEST'],
+    leadingZeroColumns: ['CEST', 'NCM'],
     unitColumn: 'Unidade',
     columnAliases: {
-      'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo'],
-      'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto'],
+      'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo', 'ID'],
+      'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto', 'Nome'],
       'CEST':                 ['cest', 'Cest'],
       'NCM':                  ['ncm', 'Ncm', 'Codigo NCM', 'Cod NCM'],
       'CSOSN':                ['csosn', 'Csosn', 'CRT', 'crt'],
@@ -173,12 +169,12 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
   },
 };
 
-
-export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; label: string }> = {
+export const VALIDATORS: Record<CellRule, {
+  test: (val: string) => boolean;
+  label: string;
+  numberAsTextLabel: string; // ← label específico por tipo de formatação
+}> = {
   numbers: {
-    // Aceita inteiros em qualquer formato do Excel:
-    // - dígitos puros:            "123", "00456" (número armazenado como texto)
-    // - número com ".0" do Excel: "123.0", "456.00" (formatação geral do Excel)
     test: (val: string) => {
       const trimmed = val.trim();
       if (/^\d+$/.test(trimmed)) return true;
@@ -186,43 +182,37 @@ export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; labe
       return Number.isFinite(num) && Number.isInteger(num) && num >= 0;
     },
     label: 'Apenas Números Inteiros',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral"',
   },
   date: {
     test: (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val.trim()),
     label: 'Data (AAAA-MM-DD)',
+    numberAsTextLabel: '', // datas não geram erro de "número como texto"
   },
   currency: {
     test: (val: string) => /^\d+([.,]\d+)?$/.test(val.trim()),
     label: 'Moeda (sem R$)',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda"',
   },
   binary: {
     test: (val: string) => /^[01]$/.test(val.trim()),
     label: 'Binário (0 ou 1)',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (apenas 0 ou 1)',
   },
-  // Juros/Multa: número com até 3 dígitos inteiros e até 2 casas decimais, formato GERAL.
-  // Com formato GERAL no Excel brasileiro, "10,50" é salvo como número 10.5 pelo Excel.
-  // O validador aceita ambas as representações:
-  //   - string com vírgula:  "10", "10,5", "10,50", "1,99", "100"  → typed as text or text-formatted
-  //   - número convertido:   "10.5", "10.50", "1.99"               → General format, Excel stored as number
-  // Rejeita: "10,500" (3 decimais), "10,5%" (símbolo), "1000" (>3 dígitos inteiros)
   juros: {
     test: (val: string) => {
       const trimmed = val.trim();
-      // Aceita vírgula (texto digitado) ou ponto (número vindo do Excel General)
       const normalized = trimmed.replace(',', '.');
       const num = Number(normalized);
       if (!Number.isFinite(num) || num < 0) return false;
-      // Até 3 dígitos na parte inteira
       const [intPart, decPart = ''] = normalized.split('.');
       if (intPart.length > 3) return false;
-      // Até 2 casas decimais
       if (decPart.length > 2) return false;
       return true;
     },
     label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (ex: 10,50)',
   },
-  // Quantidade de estoque: inteiro positivo ou negativo.
-  // Quando UNIDADE = KG, aceita decimal — a validação cruzada é feita em validateFile.ts.
   stock: {
     test: (val: string) => {
       const trimmed = val.trim();
@@ -230,5 +220,21 @@ export const VALIDATORS: Record<CellRule, { test: (val: string) => boolean; labe
       return Number.isFinite(num) && Number.isInteger(num);
     },
     label: 'Quantidade (inteiro, pode ser negativo)',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Número" (inteiros, pode ser negativo)',
+  },
+  text: {
+    test: (val: string) => val.trim().length > 0,
+    label: 'Texto (formato Texto no Excel — preserva zeros à esquerda)',
+    numberAsTextLabel: '', // colunas de texto não geram erro de "número como texto"
   },
 };
+
+export function validateCell(
+  rule: CellRule | CellRule[],
+  val: string,
+): { valid: boolean; label: string } {
+  const rules = Array.isArray(rule) ? rule : [rule];
+  const valid = rules.some(r => VALIDATORS[r].test(val));
+  const label = rules.map(r => VALIDATORS[r].label).join(' ou ');
+  return { valid, label };
+}

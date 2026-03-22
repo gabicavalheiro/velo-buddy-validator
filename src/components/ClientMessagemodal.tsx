@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, MessageSquare } from 'lucide-react';
 import type { CellRule } from '@/lib/validationRules';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
+
 import {
   NUMBER_AS_TEXT_PREFIX,
   LEADING_ZERO_LABEL,
   DATE_AS_SERIAL_LABEL,
   DATE_WRONG_FORMAT_LABEL,
-  JUROS_RULE_LABEL,
   INSTRUCTION_ROW_LABEL,
   REQUIRED_VALUE_LABEL,
 } from '@/lib/validateFile';
@@ -21,14 +21,13 @@ interface Props {
   fileTypeLabel: string;
 }
 
-// Formato final exigido após corrigir "número como texto", por tipo de regra
 function finalFormatLabel(rule: CellRule): string {
   switch (rule) {
     case 'currency': return 'Moeda (2 casas decimais, sem R$)';
     case 'juros':    return 'Geral';
     case 'stock':    return 'Número (inteiro, pode ser negativo)';
-    case 'numbers':  return 'Geral';
-    case 'binary':   return 'Geral';
+    case 'numbers':
+    case 'binary':
     default:         return 'Geral';
   }
 }
@@ -36,13 +35,10 @@ function finalFormatLabel(rule: CellRule): string {
 function finalFormatPath(rule: CellRule): string {
   switch (rule) {
     case 'currency': return 'Página Inicial → Número → Moeda';
-    case 'stock':
-    case 'numbers':  return 'Página Inicial → Número → Geral';
     default:         return 'Página Inicial → Número → Geral';
   }
 }
 
-// Agrupa os erros de célula por (ruleLabel, rule) para conseguir instruções específicas
 function groupErrors(cellErrors: CellError[]): Map<string, { rule: CellRule; cols: string[] }> {
   const map = new Map<string, { rule: CellRule; cols: string[] }>();
   for (const e of cellErrors) {
@@ -62,7 +58,6 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
   lines.push(`Planilha *${fileName}* (${fileTypeLabel}) — encontramos os seguintes pontos para corrigir:`);
   lines.push('');
 
-  // Linha de instruções
   const instrError = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
   if (instrError) {
     lines.push('⚠️ *Linha de instruções detectada*');
@@ -70,7 +65,6 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     lines.push('');
   }
 
-  // Colunas em falta
   if (result.columnErrors.length > 0) {
     lines.push('📋 *Colunas obrigatórias em falta*');
     result.columnErrors.forEach(e => lines.push(`  • ${e.column}`));
@@ -78,14 +72,12 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     lines.push('');
   }
 
-  const grouped = groupErrors(result.cellErrors);
-
-  for (const [key, { rule, cols }] of grouped) {
+  for (const [key, { rule, cols }] of groupErrors(result.cellErrors)) {
     const ruleLabel = key.split('||')[0];
-    const colList = cols.map(c => `*${c}*`).join(', ');
+    const colList   = cols.map(c => `*${c}*`).join(', ');
 
     if (ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX)) {
-      const fmt = finalFormatLabel(rule);
+      const fmt  = finalFormatLabel(rule);
       const path = finalFormatPath(rule);
       lines.push('🔢 *Número armazenado como texto*');
       lines.push(`Coluna(s): ${colList}`);
@@ -122,7 +114,8 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push('As datas estão num formato inválido (ex: 31/12/2024). O padrão exigido é *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos acima.');
       lines.push('');
 
-    } else if (ruleLabel === JUROS_RULE_LABEL) {
+    // ← Usa rule === 'juros' em vez do label removido
+    } else if (rule === 'juros') {
       lines.push('📊 *Formato de Juros/Multa incorreto*');
       lines.push(`Coluna(s): ${colList}`);
       lines.push('Os valores devem ter no máximo 3 dígitos inteiros e 2 casas decimais separadas por *vírgula* (ex: 10,50). A célula deve estar no formato *Geral* no Excel.');
@@ -146,7 +139,6 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push('');
 
     } else {
-      // Erros genéricos
       const fmt = finalFormatLabel(rule);
       lines.push(`❌ *Valor inválido — ${fmt}*`);
       lines.push(`Coluna(s): ${colList}`);
@@ -193,7 +185,6 @@ export default function ClientMessageModal({ open, onClose, result, fileName, fi
           >
             <div className="w-full sm:max-w-lg bg-card sm:rounded-2xl rounded-t-2xl shadow-card overflow-hidden max-h-[92dvh] flex flex-col">
 
-              {/* Header */}
               <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 shrink-0" style={{ background: 'hsl(270 60% 38%)' }}>
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
@@ -209,7 +200,6 @@ export default function ClientMessageModal({ open, onClose, result, fileName, fi
                 </button>
               </div>
 
-              {/* Message preview */}
               <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
                 <pre
                   className="whitespace-pre-wrap text-xs sm:text-sm text-foreground leading-relaxed font-sans rounded-xl p-4 border border-border"
@@ -219,7 +209,6 @@ export default function ClientMessageModal({ open, onClose, result, fileName, fi
                 </pre>
               </div>
 
-              {/* Footer */}
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex gap-2 shrink-0">
                 <button
                   onClick={onClose}

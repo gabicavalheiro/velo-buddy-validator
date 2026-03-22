@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, FileWarning, BarChart3, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare, MapPin } from 'lucide-react';
 import type { ValidationResult, CellError } from '@/lib/validateFile';
-import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL, JUROS_RULE_LABEL } from '@/lib/validateFile';
-import HelpModal from './Helpmodal.tsx';
+// linha 5 — remove JUROS_RULE_LABEL do import
+import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL } from '@/lib/validateFile';import HelpModal from './Helpmodal.tsx';
 import ClientMessageModal from './ClientMessagemodal.tsx';
 
 interface Props {
@@ -20,9 +20,9 @@ function CellErrorRow({ error, index }: { error: CellError; index: number }) {
   const isNumberAsText = error.ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX);
   const isDateSerial = error.ruleLabel === DATE_AS_SERIAL_LABEL;
   const isDateWrongFormat = error.ruleLabel === DATE_WRONG_FORMAT_LABEL;
-  const isJurosRule = error.ruleLabel === JUROS_RULE_LABEL;
-  const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
-  const showHelp = isNumberAsText || isLeadingZero || isDateSerial || isDateWrongFormat || isJurosRule;
+// linha 43 — CellErrorRow
+const isJurosRule = error.rule === 'juros'; // ← era: error.ruleLabel === JUROS_RULE_LABEL  const isLeadingZero = error.ruleLabel === LEADING_ZERO_LABEL;
+  const showHelp = isNumberAsText  || isDateSerial || isDateWrongFormat || isJurosRule;
 
   return (
     <>
@@ -302,7 +302,8 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
       )}
 
       {/* Juros rule explanation card — aparece quando há erros de formato em colunas de Juros/Multa */}
-      {result.cellErrors.some(e => e.ruleLabel === JUROS_RULE_LABEL) && (
+      // ErrorDashboard — card explicativo de juros
+      {result.cellErrors.some(e => e.rule === 'juros') && ( // ← era: e.ruleLabel === JUROS_RULE_LABEL
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
