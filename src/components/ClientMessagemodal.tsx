@@ -130,12 +130,11 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     } else if (ruleLabel.toLowerCase().includes('morada')) {
       lines.push('🏠 *REGRA DE ENDEREÇO — ATENÇÃO*');
       lines.push('');
-      lines.push('Uma vez que *qualquer* campo de endereço for preenchido, *TODOS* os campos se tornam obrigatórios:');
-      lines.push('');
+      lines.push('Não é permitido preencher apenas alguns campos de endereço.');
+      lines.push('⚠️ *Atenção:* endereço incompleto faz o Velo salvar os dados como Observação em vez de endereço.');      lines.push('');
       lines.push('👉 *CEP* | *LOGRADOURO* | *NÚMERO* | *COMPLEMENTO* | *BAIRRO* | *REFERÊNCIA* | *CIDADE* | *ESTADO*');
       lines.push('');
       lines.push(`Nas linhas com erro (campo(s) vazio(s): ${colList}), preencha *todos* os campos acima ou deixe *todos* em branco.`);
-      lines.push('Não é permitido preencher apenas alguns campos de endereço.');
       lines.push('');
 
     } else {

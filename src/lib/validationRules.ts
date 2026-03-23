@@ -10,41 +10,73 @@ export interface FileTypeConfig {
   requiredValueColumns?: string[];
   leadingZeroColumns?: string[];
   unitColumn?: string;
+  charLimits?: Record<string, number>;
+  // specialCharColumns removido — a varredura agora é universal (todas as colunas)
 }
 
 export const FILE_TYPES: Record<string, FileTypeConfig> = {
   clientes: {
     label: 'Clientes e Fornecedores',
     skipRows: 0,
-    requiredColumns: ['Código', 'Nome/Razão Social', 'I.E', 'Simples Nacional', 'Cliente', 'Fornecedor'],
+    requiredColumns: ['Código', 'Nome/Razão Social', 'Isento I.E', 'Simples Nacional', 'Cliente', 'Fornecedor'],
     cellRules: {
       'Código':                   'numbers',
       'CPF/CNPJ':                 'text',
       'I.E':                      'text',
+      'Isento I.E':               'binary',
+      'Simples Nacional':         'binary',
+      'Data Nascimento/Fundação': 'date',
       'Telefone':                 ['text', 'numbers'],
       'Celular':                  ['text', 'numbers'],
-      'Data Nascimento/Fundação': 'date',
       'Data Cadastro':            'date',
-      'Simples Nacional':         'binary',
+      'Hora Cadastro':            'text',
       'Cliente':                  'binary',
       'Fornecedor':               'binary',
+      'Forn. Produto':            'binary',
+      'Forn. Serviço':            'binary',
+      'Forn. Transporte':         'binary',
+    },
+    charLimits: {
+      'Código':            11,
+      'Nome/Razão Social': 60,
+      'Apelido':           60,
+      'Telefone':          10,
+      'Celular':           11,
+      'Email':             80,
+      'CEP':               8,
+      'Logradouro':        150,
+      'Número':            8,
+      'Complemento':       50,
+      'Bairro':            50,
+      'Referência':        50,
+      'Cidade':            50,
+      'Estado':            2,
+      'Observação':        300,
     },
     leadingZeroColumns: ['CPF/CNPJ', 'I.E'],
     columnAliases: {
       'Código':                   ['Cod', 'Cod.', 'codigo', 'Codigo', 'id', 'idpessoa', 'IdPessoa'],
       'Nome/Razão Social':        ['Nome', 'Razão Social', 'Razao Social', 'nome', 'Descricao'],
+      'Apelido':                  ['Nome Fantasia', 'Fantasia', 'apelido'],
       'I.E':                      ['I.E.', 'IE', 'Inscrição Estadual', 'Inscricao Estadual', 'CNH', 'CNH/IE'],
+      'Isento I.E':               ['Isento IE', 'IsentoIE', 'Isento de IE', 'Isento de I.E', 'Isento de I.E.'],
       'CPF/CNPJ':                 ['CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj', 'Cpf/Cnpj'],
       'Telefone':                 ['Tel', 'Tel.', 'Fone', 'telefone'],
       'Celular':                  ['Cel', 'Cel.', 'celular', 'WhatsApp'],
       'Data Nascimento/Fundação': ['Data Nascimento', 'Data Fundação', 'Nascimento', 'Fundação'],
       'Data Cadastro':            ['Dt Cadastro', 'Data de Cadastro', 'cadastro'],
+      'Hora Cadastro':            ['Hora', 'Hora Cad', 'Hr Cadastro'],
       'Simples Nacional':         ['Simples', 'SN'],
       'Cliente':                  ['cliente', 'cli'],
       'Fornecedor':               ['fornecedor', 'forn'],
+      'Forn. Produto':            ['Fornecedor Produto', 'Forn Produto', 'FornProduto', 'Forn. de Produto'],
+      'Forn. Serviço':            ['Fornecedor Servico', 'Forn Servico', 'FornServico', 'Forn. de Serviço', 'Forn. Servico'],
+      'Forn. Transporte':         ['Fornecedor Transporte', 'Forn Transporte', 'FornTransporte', 'Forn. de Transporte'],
+      'Observação':               ['Obs', 'Observacao', 'obs', 'Notas', 'Nota'],
     },
-    addressColumns: ['CEP', 'Logradouro', 'Número', 'Bairro', 'Cidade', 'Estado', 'País'],
+    addressColumns: ['CEP', 'Logradouro', 'Número', 'Complemento', 'Bairro', 'Referência', 'Cidade', 'Estado'],
   },
+
   produtoSimples: {
     label: 'Produto Simples',
     skipRows: 0,
@@ -80,6 +112,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Balança':              ['Balanca', 'balanca'],
     },
   },
+
   produtoGrade: {
     label: 'Produtos de Grade',
     skipRows: 0,
@@ -107,6 +140,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Unidade':    ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
     },
   },
+
   contasPagar: {
     label: 'Contas a Pagar',
     skipRows: 0,
@@ -135,6 +169,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Data de Vencimento': ['Dt Vencimento', 'Vencimento', 'Dt Venc'],
     },
   },
+
   contasReceber: {
     label: 'Contas a Receber',
     skipRows: 0,
@@ -172,7 +207,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
 export const VALIDATORS: Record<CellRule, {
   test: (val: string) => boolean;
   label: string;
-  numberAsTextLabel: string; // ← label específico por tipo de formatação
+  numberAsTextLabel: string;
 }> = {
   numbers: {
     test: (val: string) => {
@@ -187,7 +222,7 @@ export const VALIDATORS: Record<CellRule, {
   date: {
     test: (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val.trim()),
     label: 'Data (AAAA-MM-DD)',
-    numberAsTextLabel: '', // datas não geram erro de "número como texto"
+    numberAsTextLabel: '',
   },
   currency: {
     test: (val: string) => /^\d+([.,]\d+)?$/.test(val.trim()),
@@ -225,7 +260,7 @@ export const VALIDATORS: Record<CellRule, {
   text: {
     test: (val: string) => val.trim().length > 0,
     label: 'Texto (formato Texto no Excel — preserva zeros à esquerda)',
-    numberAsTextLabel: '', // colunas de texto não geram erro de "número como texto"
+    numberAsTextLabel: '',
   },
 };
 

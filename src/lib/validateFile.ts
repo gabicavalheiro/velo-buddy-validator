@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
 import { FileTypeConfig, VALIDATORS, CellRule } from './validationRules';
 
-export interface ColumnError    { column: string }
-export interface CellErrorDetail { row: number; value: string }
+export interface ColumnError     { column: string }
+export interface CellErrorDetail { row: number; value: string; colName?: string }
 export interface CellError {
   column: string; rule: CellRule; ruleLabel: string;
   failCount: number; totalCount: number; details: CellErrorDetail[];
@@ -18,6 +18,33 @@ export const REQUIRED_VALUE_LABEL    = 'Campo obrigatório — esta coluna não 
 export const INSTRUCTION_ROW_LABEL   = 'A linha 2 parece conter instruções de preenchimento e não dados reais — apague essa linha antes de importar';
 export const LEADING_ZERO_LABEL      = 'Esta coluna deve estar formatada como "Texto" no Excel — valores numéricos perdem os zeros à esquerda (ex: CPF "04652781407" vira "4652781407")';
 export const DATE_WRONG_FORMAT_LABEL = 'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
+export const CHAR_LIMIT_LABEL        = (limit: number) => `Texto excede o limite de ${limit} caracteres permitidos`;
+export const SPECIAL_CHAR_LABEL      = 'Caractere especial ou inválido encontrado — remova ou substitua pelo equivalente comum';
+
+// ─── Whitelist de caracteres permitidos ──────────────────────────────────────
+const SPECIAL_CHAR_RE =
+  /[^a-zA-Z0-9 .,\-/()'":;@_#+=!?&%\xC0-\xC3\xC7\xC9\xCA\xCD\xD3-\xD5\xDA\xDC\xE0-\xE3\xE7\xE9\xEA\xED\xF3-\xF5\xFA\xFC]/g;
+
+const INVISIBLE_CPS = new Set([
+  0x00A0, 0x00AD, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F,
+  0x2028, 0x2029, 0x202A, 0x202B, 0x202C, 0x202D, 0x202E,
+  0x2060, 0xFEFF,
+]);
+
+function findSpecialChars(val: string): string[] {
+  const found = new Set<string>();
+  const matches = val.match(SPECIAL_CHAR_RE);
+  if (!matches) return [];
+  for (const ch of matches) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (INVISIBLE_CPS.has(cp) || cp < 0x20) {
+      found.add(`[invisível U+${cp.toString(16).toUpperCase().padStart(4, '0')}]`);
+    } else {
+      found.add(`"${ch}" (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`);
+    }
+  }
+  return [...found];
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,29 +70,63 @@ const normalize = (s: string) =>
    .replace(/\s+/g, ' ').toLowerCase()
    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+// Estratégia 4: palavras ordenadas — lida com pontos e reordenação
+//   "I.E. Isento" → ["e","i","isento"] == ["e","i","isento"] ← "Isento I.E"
+const wordKey = (s: string) =>
+  normalize(s).replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+
+// Estratégia 5: slug alfanumérico — lida com "IE" vs "I.E."
+//   "isento ie" → "isentoie" == "isentoie" ← "Isento I.E"
+const slugKey = (s: string) => normalize(s).replace(/[^a-z0-9]/g, '');
+
 const makeError = (column: string, rule: CellRule, ruleLabel: string, details: CellErrorDetail[], totalCount: number): CellError =>
   ({ column, rule, ruleLabel, failCount: details.length, totalCount, details });
 
 const primaryRule = (rule: CellRule | CellRule[]): CellRule =>
   Array.isArray(rule) ? rule[0] : rule;
 
-// ─── Resolução de colunas ─────────────────────────────────────────────────────
+// ─── Resolução de colunas (5 estratégias) ─────────────────────────────────────
+//
+// 1. Correspondência exacta de string
+// 2. Normalizado (sem acentos, lowercase, espaços colapsados)
+// 3. Aliases configurados em columnAliases
+// 4. Palavras ordenadas — ignora pontos, hífens, ordem (ex: "I.E. Isento" == "Isento I.E")
+// 5. Slug alfanumérico — ignora toda pontuação (ex: "isento ie" == "isentoie")
 
 function resolveColumnIndices(headerRow: string[], config: FileTypeConfig): Map<string, number> {
-  const norm = headerRow.map(normalize);
+  const norm    = headerRow.map(normalize);
+  const wkeys   = headerRow.map(wordKey);
+  const skeys   = headerRow.map(slugKey);
   const aliases = config.columnAliases ?? {};
 
   const canonicals = new Set([
-    ...config.requiredColumns, ...Object.keys(config.cellRules),
-    ...(config.addressColumns ?? []), ...(config.requiredValueColumns ?? []),
+    ...config.requiredColumns,
+    ...Object.keys(config.cellRules),
+    ...(config.addressColumns ?? []),
+    ...(config.requiredValueColumns ?? []),
+    ...Object.keys(config.charLimits ?? {}),
   ]);
 
   return new Map(
     [...canonicals].flatMap(canonical => {
-      const idx =
-        headerRow.indexOf(canonical) !== -1 ? headerRow.indexOf(canonical) :
-        norm.findIndex(h => h === normalize(canonical)) !== -1 ? norm.findIndex(h => h === normalize(canonical)) :
-        (aliases[canonical] ?? []).reduce<number>((f, a) => f !== -1 ? f : norm.findIndex(h => h === normalize(a)), -1);
+      const normC  = normalize(canonical);
+      const wkeyC  = wordKey(canonical);
+      const skeyC  = slugKey(canonical);
+      const aliasC = aliases[canonical] ?? [];
+
+      let idx = -1;
+
+      // 1. Exacto
+      if (idx === -1) idx = headerRow.indexOf(canonical);
+      // 2. Normalizado
+      if (idx === -1) idx = norm.findIndex(h => h === normC);
+      // 3. Aliases
+      if (idx === -1) idx = aliasC.reduce<number>((f, a) => f !== -1 ? f : norm.findIndex(h => h === normalize(a)), -1);
+      // 4. Palavras ordenadas
+      if (idx === -1) idx = wkeys.findIndex(w => w === wkeyC);
+      // 5. Slug alfanumérico
+      if (idx === -1) idx = skeys.findIndex(s => s === skeyC);
+
       return idx !== -1 ? [[canonical, idx]] : [];
     })
   );
@@ -115,7 +176,7 @@ function validateColumn(
     if (!val) continue;
     total++;
     const rowNum = i + 2 + config.skipRows;
-    const detail = { row: rowNum, value: val };
+    const detail: CellErrorDetail = { row: rowNum, value: val, colName };
 
     if (rule === 'date' && typeof raw === 'number')        { d.dateSerial.push({ ...detail, value: toDateStr(raw) }); continue; }
     if (isLeadingZero)                                     { if (typeof raw === 'number') d.leadingZero.push(detail); continue; }
@@ -161,8 +222,8 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   while (lastFilled >= 0 && !(rawRows[lastFilled] as unknown[]).some(v => String(v ?? '').trim())) lastFilled--;
   const rows = rawRows.slice(0, lastFilled + 1);
 
-  const colMap    = resolveColumnIndices(headerRow, config);
-  const instrErr  = detectInstructionRow(rows);
+  const colMap   = resolveColumnIndices(headerRow, config);
+  const instrErr = detectInstructionRow(rows);
   if (instrErr) return { success: false, columnErrors: [], cellErrors: [instrErr], rowCount: rows.length - 1 };
 
   const columnErrors = config.requiredColumns
@@ -173,26 +234,26 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   const unitColIdx      = config.unitColumn ? colMap.get(config.unitColumn) : undefined;
   const cellErrors: CellError[] = [];
 
-  // Validação por cellRules
+  // ── Validação por cellRules ───────────────────────────────────────────────
   for (const [colName, rule] of Object.entries(config.cellRules)) {
     const colIdx = colMap.get(colName);
     if (colIdx === undefined) continue;
     cellErrors.push(...validateColumn(colName, primaryRule(rule), colIdx, rows, config, leadingZeroCols.has(colName), unitColIdx));
   }
 
-  // Varredura universal — colunas fora do cellRules
-  const checked = new Set(
+  // ── Varredura universal: número armazenado como texto ─────────────────────
+  const checkedForNumText = new Set(
     [...Object.keys(config.cellRules), ...(config.leadingZeroColumns ?? [])]
       .map(n => colMap.get(n)).filter((i): i is number => i !== undefined)
   );
 
   for (let ci = 0; ci < headerRow.length; ci++) {
-    if (checked.has(ci)) continue;
+    if (checkedForNumText.has(ci)) continue;
     const label   = headerRow[ci] || `Coluna ${ci + 1}`;
     const details = rows.flatMap((row, i) => {
       const raw = row[ci];
       return typeof raw === 'string' && /^-?\d+([.,]\d+)?$/.test(raw.trim())
-        ? [{ row: i + 2 + config.skipRows, value: raw.trim() }] : [];
+        ? [{ row: i + 2 + config.skipRows, value: raw.trim(), colName: label }] : [];
     });
     if (!details.length) continue;
     const rule = primaryRule((config.cellRules[label] as CellRule | CellRule[] | undefined) ?? 'numbers');
@@ -201,18 +262,55 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       details, rows.length));
   }
 
-  // Campos obrigatórios por linha
+  // ── Campos obrigatórios por linha ─────────────────────────────────────────
   for (const colName of config.requiredValueColumns ?? []) {
     const colIdx = colMap.get(colName);
     if (colIdx === undefined) continue;
     const details = rows
       .map((row, i) => ({ row: i + 2 + config.skipRows, val: String(row[colIdx] ?? '').trim() }))
       .filter(({ val }) => !val)
-      .map(({ row }) => ({ row, value: '(vazio)' }));
+      .map(({ row }) => ({ row, value: '(vazio)', colName }));
     if (details.length) cellErrors.push(makeError(colName, 'numbers', REQUIRED_VALUE_LABEL, details, rows.length));
   }
 
-  // Endereço condicional
+  // ── Limite de caracteres (charLimits) ─────────────────────────────────────
+  for (const [colName, limit] of Object.entries(config.charLimits ?? {})) {
+    const colIdx = colMap.get(colName);
+    if (colIdx === undefined) continue;
+    const details = rows.flatMap((row, i) => {
+      const val = String(row[colIdx] ?? '').trim();
+      if (!val || val.length <= limit) return [];
+      return [{ row: i + 2 + config.skipRows, value: val.slice(0, 60) + (val.length > 60 ? '…' : ''), colName }];
+    });
+    if (details.length) cellErrors.push(makeError(colName, 'text', CHAR_LIMIT_LABEL(limit), details, rows.length));
+  }
+
+  // ── Varredura universal: caracteres especiais em TODAS as colunas ─────────
+  for (let ci = 0; ci < headerRow.length; ci++) {
+    const colLabel = headerRow[ci] || `Coluna ${ci + 1}`;
+    const details: CellErrorDetail[] = [];
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const raw = rows[ri][ci];
+      if (typeof raw !== 'string' || raw === '') continue;
+
+      const specials = findSpecialChars(raw);
+      if (specials.length === 0) continue;
+
+      const preview = raw.trim().slice(0, 45) + (raw.trim().length > 45 ? '…' : '');
+      details.push({
+        row: ri + 2 + config.skipRows,
+        value: `${preview}  →  ${specials.join(', ')}`,
+        colName: colLabel,
+      });
+    }
+
+    if (details.length > 0) {
+      cellErrors.push(makeError(colLabel, 'text', SPECIAL_CHAR_LABEL, details, rows.length));
+    }
+  }
+
+  // ── Endereço condicional ──────────────────────────────────────────────────
   const addrCols = (config.addressColumns ?? [])
     .map(c => ({ name: c, idx: colMap.get(c) ?? -1 }))
     .filter(a => a.idx !== -1);
@@ -225,7 +323,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       let err = cellErrors.find(e => e.column === key);
       if (!err) { err = makeError(key, 'numbers', 'Morada obrigatória quando parcialmente preenchida', [], rows.length); cellErrors.push(err); }
       err.failCount++;
-      err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)' });
+      err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName: addr.name });
     }
   }
 
