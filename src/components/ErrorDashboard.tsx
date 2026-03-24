@@ -34,8 +34,10 @@ function groupCellErrors(errors: CellError[]): GroupedCellError[] {
     const g = map.get(key)!;
     g.columns.push(e.column);
     g.failCount += e.failCount;
-    // Injeta o nome da coluna em cada detalhe ao agrupar
-    g.details.push(...e.details.map(d => ({ ...d, colName: d.colName ?? e.column })));
+    // ✅ CORREÇÃO: push(...spread) causa stack overflow com arrays grandes.
+    // Usar concat() em vez de push(...array) para evitar o limite de argumentos do JS.
+    const mapped = e.details.map(d => ({ ...d, colName: d.colName ?? e.column }));
+    g.details = g.details.concat(mapped);
   }
 
   for (const g of map.values()) {

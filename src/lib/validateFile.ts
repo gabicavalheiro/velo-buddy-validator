@@ -21,7 +21,17 @@ export const DATE_WRONG_FORMAT_LABEL = 'Data em formato incorreto — formate a 
 export const CHAR_LIMIT_LABEL        = (limit: number) => `Texto excede o limite de ${limit} caracteres permitidos`;
 export const SPECIAL_CHAR_LABEL      = 'Caractere especial ou inválido encontrado — remova ou substitua pelo equivalente comum';
 
+// ─── Limite máximo de detalhes por erro ──────────────────────────────────────
+// Evita arrays gigantes em ficheiros com milhares de linhas com erro.
+// O utilizador vê os primeiros 200 — mais do que suficiente para corrigir.
+const MAX_DETAILS = 200;
+
 // ─── Whitelist de caracteres permitidos ──────────────────────────────────────
+// Regex SEM flag /g para uso com .test() (mais rápido — não precisa de lastIndex reset)
+const SPECIAL_CHAR_TEST =
+  /[^a-zA-Z0-9 .,\-/()'":;@_#+=!?&%\xC0-\xC3\xC7\xC9\xCA\xCD\xD3-\xD5\xDA\xDC\xE0-\xE3\xE7\xE9\xEA\xED\xF3-\xF5\xFA\xFC]/;
+
+// Regex COM flag /g apenas quando precisamos extrair os caracteres (após o test passar)
 const SPECIAL_CHAR_RE =
   /[^a-zA-Z0-9 .,\-/()'":;@_#+=!?&%\xC0-\xC3\xC7\xC9\xCA\xCD\xD3-\xD5\xDA\xDC\xE0-\xE3\xE7\xE9\xEA\xED\xF3-\xF5\xFA\xFC]/g;
 
@@ -31,7 +41,14 @@ const INVISIBLE_CPS = new Set([
   0x2060, 0xFEFF,
 ]);
 
+// Regras que produzem APENAS valores numéricos — células dessas colunas
+// chegam do Excel como number, nunca como string com char especial.
+// Podemos pular a varredura de char especial nessas colunas.
+const NUMERIC_ONLY_RULES = new Set<CellRule>(['numbers', 'currency', 'stock', 'binary', 'juros']);
+
 function findSpecialChars(val: string): string[] {
+  // Teste rápido primeiro — evita criar array quando não há nada
+  if (!SPECIAL_CHAR_TEST.test(val)) return [];
   const found = new Set<string>();
   const matches = val.match(SPECIAL_CHAR_RE);
   if (!matches) return [];
@@ -65,38 +82,51 @@ const toDateStr = (serial: number): string => {
   return d ? `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}` : String(serial);
 };
 
+// normalize: ordem correta — NFD PRIMEIRO, depois lowercase, depois strips.
+// O Excel pode entregar strings NFC/NFD mistas e espaços especiais (U+00A0, etc.).
+// Fazer NFD antes de toLowerCase garante que acentos compostos (ó, ç…) são
+// decompostos antes de qualquer comparação.
 const normalize = (s: string) =>
-  s.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '').trim()
-   .replace(/\s+/g, ' ').toLowerCase()
-   .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s
+    // 1. Strip zero-width, soft-hyphen e caracteres de controle invisíveis
+    .replace(/[\u0000-\u001F\u007F-\u009F\u00AD\u034F\u200B-\u200F\u202A-\u202E\u2060-\u2064\u206A-\u206F\uFEFF]/g, '')
+    // 2. Converter TODOS os tipos de espaço para espaço comum
+    //    (non-breaking space U+00A0, thin space, em space, ideographic space, etc.)
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+    .trim()
+    // 3. NFD PRIMEIRO — decompõe acentos antes do toLowerCase
+    .normalize('NFD')
+    // 4. Strip marcas combinadas (acentos, cedilha U+0327, til, etc.)
+    .replace(/[\u0300-\u036f]/g, '')
+    // 5. Colapsar espaços e converter para lowercase
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 
-// Estratégia 4: palavras ordenadas — lida com pontos e reordenação
-//   "I.E. Isento" → ["e","i","isento"] == ["e","i","isento"] ← "Isento I.E"
 const wordKey = (s: string) =>
   normalize(s).replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
 
-// Estratégia 5: slug alfanumérico — lida com "IE" vs "I.E."
-//   "isento ie" → "isentoie" == "isentoie" ← "Isento I.E"
 const slugKey = (s: string) => normalize(s).replace(/[^a-z0-9]/g, '');
 
+// Estratégia 6: token subset — todos os tokens significativos (>2 chars) do
+// canonical estão presentes nos tokens do header.
+// Ex: "Descrição do produto" → tokens {"descricao","produto"}
+//     header "Descricao_do_Produto" → tokens {"descricao","produto"} → MATCH
+const tokenSet = (s: string): Set<string> =>
+  new Set(normalize(s).replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(t => t.length > 2));
+
 const makeError = (column: string, rule: CellRule, ruleLabel: string, details: CellErrorDetail[], totalCount: number): CellError =>
-  ({ column, rule, ruleLabel, failCount: details.length, totalCount, details });
+  ({ column, rule, ruleLabel, failCount: details.length, totalCount, details: details.slice(0, MAX_DETAILS) });
 
 const primaryRule = (rule: CellRule | CellRule[]): CellRule =>
   Array.isArray(rule) ? rule[0] : rule;
 
-// ─── Resolução de colunas (5 estratégias) ─────────────────────────────────────
-//
-// 1. Correspondência exacta de string
-// 2. Normalizado (sem acentos, lowercase, espaços colapsados)
-// 3. Aliases configurados em columnAliases
-// 4. Palavras ordenadas — ignora pontos, hífens, ordem (ex: "I.E. Isento" == "Isento I.E")
-// 5. Slug alfanumérico — ignora toda pontuação (ex: "isento ie" == "isentoie")
+// ─── Resolução de colunas (6 estratégias) ────────────────────────────────────
 
 function resolveColumnIndices(headerRow: string[], config: FileTypeConfig): Map<string, number> {
   const norm    = headerRow.map(normalize);
   const wkeys   = headerRow.map(wordKey);
   const skeys   = headerRow.map(slugKey);
+  const tsets   = headerRow.map(tokenSet);
   const aliases = config.columnAliases ?? {};
 
   const canonicals = new Set([
@@ -109,23 +139,29 @@ function resolveColumnIndices(headerRow: string[], config: FileTypeConfig): Map<
 
   return new Map(
     [...canonicals].flatMap(canonical => {
-      const normC  = normalize(canonical);
-      const wkeyC  = wordKey(canonical);
-      const skeyC  = slugKey(canonical);
-      const aliasC = aliases[canonical] ?? [];
+      const normC   = normalize(canonical);
+      const wkeyC   = wordKey(canonical);
+      const skeyC   = slugKey(canonical);
+      const tokensC = tokenSet(canonical);
+      const aliasC  = aliases[canonical] ?? [];
 
       let idx = -1;
 
       // 1. Exacto
       if (idx === -1) idx = headerRow.indexOf(canonical);
-      // 2. Normalizado
+      // 2. Normalizado (sem acento, lowercase, espaços colapsados, spaces especiais limpos)
       if (idx === -1) idx = norm.findIndex(h => h === normC);
-      // 3. Aliases
+      // 3. Aliases (também normalizados)
       if (idx === -1) idx = aliasC.reduce<number>((f, a) => f !== -1 ? f : norm.findIndex(h => h === normalize(a)), -1);
-      // 4. Palavras ordenadas
+      // 4. Palavras ordenadas — ignora pontos, hífens, reordenação
       if (idx === -1) idx = wkeys.findIndex(w => w === wkeyC);
-      // 5. Slug alfanumérico
+      // 5. Slug alfanumérico — ignora toda pontuação (ex: "isento ie" == "isentoie")
       if (idx === -1) idx = skeys.findIndex(s => s === skeyC);
+      // 6. Token subset — todos os tokens do canonical (>2 chars) aparecem no header
+      //    Útil para "Descrição do Produto" vs "Descrição do produto" com encoding diferente
+      if (idx === -1 && tokensC.size > 0) {
+        idx = tsets.findIndex(ts => [...tokensC].every(t => ts.has(t)));
+      }
 
       return idx !== -1 ? [[canonical, idx]] : [];
     })
@@ -175,21 +211,39 @@ function validateColumn(
     const val = String(raw ?? '').trim();
     if (!val) continue;
     total++;
+
+    // Para evitar criar objetos desnecessários quando já atingimos o limite
     const rowNum = i + 2 + config.skipRows;
     const detail: CellErrorDetail = { row: rowNum, value: val, colName };
 
-    if (rule === 'date' && typeof raw === 'number')        { d.dateSerial.push({ ...detail, value: toDateStr(raw) }); continue; }
-    if (isLeadingZero)                                     { if (typeof raw === 'number') d.leadingZero.push(detail); continue; }
-    if (typeof raw === 'string' && rule !== 'date' && rule !== 'text') { d.numberText.push(detail); continue; }
+    if (rule === 'date' && typeof raw === 'number') {
+      // Converte o serial para string AAAA-MM-DD e valida
+      const dateStr = toDateStr(raw);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        // Serial válido (ex: célula formatada como Data no Excel) — aceita, não é erro
+        total++;
+        continue;
+      }
+      // Serial inválido ou não convertível — aí sim é erro
+      if (d.dateSerial.length < MAX_DETAILS) d.dateSerial.push({ ...detail, value: dateStr });
+      continue;
+    }
+    if (isLeadingZero)                                     { if (typeof raw === 'number' && d.leadingZero.length < MAX_DETAILS) d.leadingZero.push(detail); continue; }
+    if (typeof raw === 'string' && rule !== 'date' && rule !== 'text') { if (d.numberText.length < MAX_DETAILS) d.numberText.push(detail); continue; }
 
     if (rule === 'stock') {
       const unit = unitColIdx != null ? String(rows[i][unitColIdx] ?? '').trim().toLowerCase() : '';
       const num  = Number(val);
-      if (!Number.isFinite(num) || (!KG_ALIASES.has(unit) && !Number.isInteger(num))) d.invalid.push(detail);
+      if (!Number.isFinite(num) || (!KG_ALIASES.has(unit) && !Number.isInteger(num))) {
+        if (d.invalid.length < MAX_DETAILS) d.invalid.push(detail);
+      }
       continue;
     }
 
-    if (!validator.test(val)) (rule === 'date' ? d.dateFormat : d.invalid).push(detail);
+    if (!validator.test(val)) {
+      const bucket = rule === 'date' ? d.dateFormat : d.invalid;
+      if (bucket.length < MAX_DETAILS) bucket.push(detail);
+    }
   }
 
   return ([
@@ -238,7 +292,8 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   for (const [colName, rule] of Object.entries(config.cellRules)) {
     const colIdx = colMap.get(colName);
     if (colIdx === undefined) continue;
-    cellErrors.push(...validateColumn(colName, primaryRule(rule), colIdx, rows, config, leadingZeroCols.has(colName), unitColIdx));
+    const errs = validateColumn(colName, primaryRule(rule), colIdx, rows, config, leadingZeroCols.has(colName), unitColIdx);
+    for (const e of errs) cellErrors.push(e);
   }
 
   // ── Varredura universal: número armazenado como texto ─────────────────────
@@ -250,11 +305,16 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   for (let ci = 0; ci < headerRow.length; ci++) {
     if (checkedForNumText.has(ci)) continue;
     const label   = headerRow[ci] || `Coluna ${ci + 1}`;
-    const details = rows.flatMap((row, i) => {
-      const raw = row[ci];
-      return typeof raw === 'string' && /^-?\d+([.,]\d+)?$/.test(raw.trim())
-        ? [{ row: i + 2 + config.skipRows, value: raw.trim(), colName: label }] : [];
-    });
+    const details: CellErrorDetail[] = [];
+    for (let ri = 0; ri < rows.length; ri++) {
+      if (details.length >= MAX_DETAILS) break; // ← cap antecipado
+      const raw = rows[ri][ci];
+      if (typeof raw !== 'string') continue;
+      const trimmed = raw.trim();
+      if (trimmed && /^-?\d+([.,]\d+)?$/.test(trimmed)) {
+        details.push({ row: ri + 2 + config.skipRows, value: trimmed, colName: label });
+      }
+    }
     if (!details.length) continue;
     const rule = primaryRule((config.cellRules[label] as CellRule | CellRule[] | undefined) ?? 'numbers');
     cellErrors.push(makeError(label, rule,
@@ -266,33 +326,61 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   for (const colName of config.requiredValueColumns ?? []) {
     const colIdx = colMap.get(colName);
     if (colIdx === undefined) continue;
-    const details = rows
-      .map((row, i) => ({ row: i + 2 + config.skipRows, val: String(row[colIdx] ?? '').trim() }))
-      .filter(({ val }) => !val)
-      .map(({ row }) => ({ row, value: '(vazio)', colName }));
-    if (details.length) cellErrors.push(makeError(colName, 'numbers', REQUIRED_VALUE_LABEL, details, rows.length));
+    const details: CellErrorDetail[] = [];
+    let total = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const val = String(rows[i][colIdx] ?? '').trim();
+      total++;
+      if (!val && details.length < MAX_DETAILS) {
+        details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName });
+      }
+    }
+    if (details.length) cellErrors.push(makeError(colName, 'numbers', REQUIRED_VALUE_LABEL, details, total));
   }
 
   // ── Limite de caracteres (charLimits) ─────────────────────────────────────
   for (const [colName, limit] of Object.entries(config.charLimits ?? {})) {
     const colIdx = colMap.get(colName);
     if (colIdx === undefined) continue;
-    const details = rows.flatMap((row, i) => {
-      const val = String(row[colIdx] ?? '').trim();
-      if (!val || val.length <= limit) return [];
-      return [{ row: i + 2 + config.skipRows, value: val.slice(0, 60) + (val.length > 60 ? '…' : ''), colName }];
-    });
+    const details: CellErrorDetail[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      if (details.length >= MAX_DETAILS) break;
+      const val = String(rows[i][colIdx] ?? '').trim();
+      if (val && val.length > limit) {
+        details.push({ row: i + 2 + config.skipRows, value: val.slice(0, 60) + (val.length > 60 ? '…' : ''), colName });
+      }
+    }
     if (details.length) cellErrors.push(makeError(colName, 'text', CHAR_LIMIT_LABEL(limit), details, rows.length));
   }
 
   // ── Varredura universal: caracteres especiais em TODAS as colunas ─────────
+  // Otimizações:
+  // 1. Pula colunas mapeadas como regras puramente numéricas (chegam como number do Excel)
+  // 2. Usa SPECIAL_CHAR_TEST (.test) como guarda rápida antes de chamar .match (que cria array)
+  // 3. Para de coletar detalhes ao atingir MAX_DETAILS
+
+  // Monta set de índices de colunas com regra numérica — não precisam de scan de char especial
+  const numericColIndices = new Set<number>();
+  for (const [colName, rule] of Object.entries(config.cellRules)) {
+    const colIdx = colMap.get(colName);
+    if (colIdx !== undefined && NUMERIC_ONLY_RULES.has(primaryRule(rule))) {
+      numericColIndices.add(colIdx);
+    }
+  }
+
   for (let ci = 0; ci < headerRow.length; ci++) {
+    if (numericColIndices.has(ci)) continue; // ← pula colunas numéricas
+
     const colLabel = headerRow[ci] || `Coluna ${ci + 1}`;
     const details: CellErrorDetail[] = [];
 
     for (let ri = 0; ri < rows.length; ri++) {
+      if (details.length >= MAX_DETAILS) break; // ← cap antecipado
       const raw = rows[ri][ci];
       if (typeof raw !== 'string' || raw === '') continue;
+
+      // Teste rápido antes de fazer o match completo
+      if (!SPECIAL_CHAR_TEST.test(raw)) continue;
 
       const specials = findSpecialChars(raw);
       if (specials.length === 0) continue;
@@ -322,8 +410,10 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       const key = `${addr.name} (morada incompleta)`;
       let err = cellErrors.find(e => e.column === key);
       if (!err) { err = makeError(key, 'numbers', 'Morada obrigatória quando parcialmente preenchida', [], rows.length); cellErrors.push(err); }
+      if (err.failCount < MAX_DETAILS) {
+        err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName: addr.name });
+      }
       err.failCount++;
-      err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName: addr.name });
     }
   }
 

@@ -11,6 +11,12 @@ import confetti from 'canvas-confetti';
 import logoVelo from '@/assets/logo-velo.png';
 import GuideDrawer from '@/components/GuideDrawer';
 
+// Cede o controlo ao browser por um frame antes de executar trabalho pesado.
+// Garante que o spinner "A validar o ficheiro..." aparece antes de bloquear a thread.
+function yieldToUI(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 const Index = () => {
   const [fileType, setFileType] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -24,9 +30,17 @@ const Index = () => {
     setLoading(true);
     setResult(null);
     setFileName(file.name);
+
+    // Aguarda o próximo frame para o React pintar o spinner antes de bloquear a thread
+    await yieldToUI();
+
     try {
       const workbook = await parseFile(file);
       const config = FILE_TYPES[fileType];
+
+      // Cede mais um frame — parseFile é async e o browser pode não ter repintado ainda
+      await yieldToUI();
+
       const validationResult = validateWorkbook(workbook, config);
       setResult(validationResult);
       if (validationResult.success) {
@@ -53,98 +67,42 @@ const Index = () => {
 
   return (
     <>
-    <div className="min-h-screen min-h-dvh flex flex-col md:flex-row">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
 
-      
-        
-
-      {/* Faixa topo — só mobile */}
-      <div
-        className="md:hidden flex items-center justify-between py-3 px-4"
-        style={{ background: 'linear-gradient(90deg, hsl(300 60% 20%) 0%, hsl(340 55% 30%) 100%)' }}
-      >
-        <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-9 w-auto" />
-        <button
-          onClick={() => setGuideOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors text-white text-xs font-semibold"
-        >
-          <BookOpen className="h-3.5 w-3.5" />
-          Guia
-        </button>
-      </div>
-
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 py-6 sm:py-10 bg-background overflow-y-auto">
-        <div className="w-full max-w-2xl">
-
-          {/* Logo — só desktop */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="hidden md:flex flex-col items-center mb-8 relative w-full"
+        <div className="flex items-center justify-between mb-6 sm:mb-8">
+          <img src={logoVelo} alt="Velo" className="h-10 sm:h-12" />
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card text-sm font-semibold text-foreground shadow-soft hover:bg-muted/50 transition-colors"
           >
-            <button
-              onClick={() => setGuideOpen(true)}
-              className="absolute top-0 right-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90"
-              style={{ background: 'hsl(270 60% 38% / 0.08)', color: 'hsl(270 60% 38%)', border: '1px solid hsl(270 60% 38% / 0.2)' }}
-            >
-              <BookOpen className="h-4 w-4" />
-              Guia Rápido
-            </button>
-            <img src={logoVelo} alt="Velo Sistema de Gestão" className="h-16 lg:h-20 w-auto mb-4 select-none" />
-            <h1 className="text-xl sm:text-2xl font-bold font-heading text-foreground">Validador de Planilhas</h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm mt-1 leading-relaxed">
-              Carregue o ficheiro e verifique se está pronto para importação.
-            </p>
-          </motion.div>
-
-          {/* Título mobile */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="md:hidden text-center mb-5 mt-2"
+            <BookOpen className="h-4 w-4" />
+            Guia Rápido
+          </button>
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="flex sm:hidden items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground shadow-soft"
           >
-            <h1 className="text-lg font-bold font-heading text-foreground">Validador de Planilhas</h1>
-            <p className="text-xs text-muted-foreground mt-1">Carregue o ficheiro e verifique se está pronto para importação.</p>
-          </motion.div>
+            <BookOpen className="h-3.5 w-3.5" />
+            Guia
+          </button>
+        </div>
 
-          {/* Banner de sucesso */}
-          {result?.success && !loading && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl p-4 sm:p-6 text-center shadow-card mb-5"
-              style={{ background: 'hsl(var(--success) / 0.08)', border: '1px solid hsl(var(--success) / 0.2)' }}
-            >
-              <CheckCircle2 className="mx-auto h-8 w-8 sm:h-10 sm:w-10 mb-2" style={{ color: 'hsl(var(--success))' }} />
-              <h2 className="text-base sm:text-lg font-bold font-heading text-foreground mb-1">Tudo perfeito! 🎉</h2>
-              <p className="text-muted-foreground text-xs sm:text-sm">As colunas e células estão corretas. Pode importar sem problemas!</p>
-              <p className="mt-1 text-xs text-muted-foreground">{result.rowCount} linhas analisadas em <strong className="break-all">{fileName}</strong></p>
-            </motion.div>
-          )}
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground mb-2">Validador de Planilhas</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Carregue o ficheiro e verifique se está pronto para importação.</p>
+        </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList
-              className="w-full grid grid-cols-2 h-11 rounded-xl p-1 mb-4"
-              style={{ background: 'hsl(270 20% 90%)' }}
-            >
-              <TabsTrigger value="upload" className="rounded-lg text-xs sm:text-sm font-semibold gap-1.5 data-[state=active]:shadow-soft data-[state=active]:text-primary">
-                <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                <span className="truncate">Inserir Ficheiro</span>
+        <div className="bg-card rounded-2xl shadow-card border border-border p-4 sm:p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full mb-5 sm:mb-6 h-11 sm:h-12 rounded-xl bg-muted p-1">
+              <TabsTrigger value="upload" className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-soft">
+                <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Inserir Ficheiro
               </TabsTrigger>
-              <TabsTrigger value="dashboard" className="rounded-lg text-xs sm:text-sm font-semibold gap-1.5 data-[state=active]:shadow-soft data-[state=active]:text-primary relative">
-                <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                <span className="truncate">Dashboard de Erros</span>
-                {result && !result.success && totalErrors > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center rounded-full text-white text-[10px] font-bold px-1"
-                    style={{ background: 'hsl(18 90% 52%)' }}
-                  >
-                    {totalErrors}
-                  </span>
-                )}
-              </TabsTrigger>
+              <TabsTrigger value="dashboard" className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-lg relative data-[state=active]:bg-card data-[state=active]:shadow-soft">
+                <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Dashboard de Erros</TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-0">
