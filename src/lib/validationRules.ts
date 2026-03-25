@@ -1,4 +1,14 @@
-export type CellRule = 'numbers' | 'date' | 'currency' | 'binary' | 'juros' | 'stock' | 'text';
+// src/lib/validationRules.ts
+
+export type CellRule =
+  | 'numbers'
+  | 'currency'      // vírgula decimal — Contas a Pagar, Produtos
+  | 'currency_dot'  // ponto decimal   — Contas a Receber
+  | 'date'
+  | 'binary'
+  | 'juros'
+  | 'stock'
+  | 'text';
 
 export interface FileTypeConfig {
   label: string;
@@ -13,7 +23,10 @@ export interface FileTypeConfig {
   charLimits?: Record<string, number>;
 }
 
+// ─── Tipos de ficheiro ────────────────────────────────────────────────────────
+
 export const FILE_TYPES: Record<string, FileTypeConfig> = {
+
   clientes: {
     label: 'Clientes e Fornecedores',
     skipRows: 0,
@@ -54,76 +67,24 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     },
     leadingZeroColumns: ['CPF/CNPJ', 'I.E'],
     columnAliases: {
-      'Código': [
-        'Cod', 'Cod.', 'codigo', 'Codigo', 'CODIGO', 'id', 'ID',
-        'idpessoa', 'IdPessoa', 'id_pessoa', 'Cod Pessoa', 'CodPessoa',
-      ],
-      'Nome/Razão Social': [
-        'Nome', 'NOME', 'Razão Social', 'Razao Social', 'RAZAO SOCIAL',
-        'nome', 'Descricao', 'RazaoSocial', 'Nome Razao Social',
-        'Nome/Razao Social', 'Nome / Razão Social',
-      ],
-      'Apelido': [
-        'Nome Fantasia', 'NomeFantasia', 'Fantasia', 'FANTASIA',
-        'apelido', 'APELIDO', 'Nome Comercial',
-      ],
-      'I.E': [
-        'I.E.', 'IE', 'ie', 'Ie', 'IE.', 'Inscrição Estadual',
-        'Inscricao Estadual', 'INSCRICAO ESTADUAL', 'CNH', 'CNH/IE',
-        'Insc Estadual', 'InscEstadual',
-      ],
-      'Isento I.E': [
-        'Isento IE', 'IsentoIE', 'Isento de IE', 'Isento de I.E',
-        'Isento de I.E.', 'ISENTO IE', 'isento_ie', 'Isento',
-      ],
-      'CPF/CNPJ': [
-        'CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj', 'Cpf/Cnpj',
-        'CPF_CNPJ', 'cpf_cnpj', 'CpfCnpj', 'Cpf Cnpj', 'CPF CNPJ',
-        'Documento', 'Doc', 'DOCUMENTO',
-      ],
-      'Telefone': [
-        'Tel', 'Tel.', 'TEL', 'Fone', 'FONE', 'telefone', 'TELEFONE',
-        'Telefone Fixo', 'Fone Fixo', 'Fixo',
-      ],
-      'Celular': [
-        'Cel', 'Cel.', 'CEL', 'celular', 'CELULAR', 'WhatsApp',
-        'Whatsapp', 'WHATSAPP', 'Fone Cel', 'Tel Cel',
-      ],
-      'Data Nascimento/Fundação': [
-        'Data Nascimento', 'Data Fundação', 'Nascimento', 'Fundação',
-        'Dt Nascimento', 'Dt Fundacao', 'Dt Nasc',
-        'Data Nasc', 'DataNascimento',
-      ],
-      'Data Cadastro': [
-        'Dt Cadastro', 'Data de Cadastro', 'cadastro', 'CADASTRO',
-        'Dt Cad', 'DtCadastro', 'DataCadastro',
-      ],
-      'Hora Cadastro': [
-        'Hora', 'HORA', 'Hora Cad', 'Hr Cadastro', 'HrCadastro',
-      ],
-      'Simples Nacional': [
-        'Simples', 'SN', 'sn', 'SimplesNacional', 'Simples Nac',
-        'SIMPLES NACIONAL', 'Simples Nacional (0/1)',
-      ],
-      'Cliente':       ['cliente', 'CLIENTE', 'cli', 'Is Cliente', 'Eh Cliente'],
-      'Fornecedor':    ['fornecedor', 'FORNECEDOR', 'forn', 'Is Fornecedor'],
-      'Forn. Produto': [
-        'Fornecedor Produto', 'Forn Produto', 'FornProduto',
-        'Forn. de Produto', 'Fornecedor de Produto', 'Forn Prod',
-      ],
-      'Forn. Serviço': [
-        'Fornecedor Servico', 'Forn Servico', 'FornServico',
-        'Forn. de Serviço', 'Forn. Servico', 'Forn Serviço',
-        'Fornecedor de Serviço', 'Fornecedor Serviço',
-      ],
-      'Forn. Transporte': [
-        'Fornecedor Transporte', 'Forn Transporte', 'FornTransporte',
-        'Forn. de Transporte', 'Fornecedor de Transporte', 'Forn Transp',
-      ],
-      'Observação': [
-        'Obs', 'OBS', 'Observacao', 'obs', 'OBSERVACAO', 'OBSERVAÇÃO',
-        'Notas', 'Nota', 'notas', 'nota',
-      ],
+      'Código':                   ['Cod', 'Cod.', 'codigo', 'Codigo', 'id', 'idpessoa', 'IdPessoa'],
+      'Nome/Razão Social':        ['Nome', 'Razão Social', 'Razao Social', 'nome', 'Descricao'],
+      'Apelido':                  ['Nome Fantasia', 'Fantasia', 'apelido'],
+      'I.E':                      ['I.E.', 'IE', 'Inscrição Estadual', 'Inscricao Estadual', 'CNH', 'CNH/IE'],
+      'Isento I.E':               ['Isento IE', 'IsentoIE', 'Isento de IE', 'Isento de I.E', 'Isento de I.E.'],
+      'CPF/CNPJ':                 ['CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj', 'Cpf/Cnpj'],
+      'Telefone':                 ['Tel', 'Tel.', 'Fone', 'telefone'],
+      'Celular':                  ['Cel', 'Cel.', 'celular', 'WhatsApp'],
+      'Data Nascimento/Fundação': ['Data Nascimento', 'Data Fundação', 'Nascimento', 'Fundação'],
+      'Data Cadastro':            ['Dt Cadastro', 'Data de Cadastro', 'cadastro'],
+      'Hora Cadastro':            ['Hora', 'Hora Cad', 'Hr Cadastro'],
+      'Simples Nacional':         ['Simples', 'SN'],
+      'Cliente':                  ['cliente', 'cli'],
+      'Fornecedor':               ['fornecedor', 'forn'],
+      'Forn. Produto':            ['Fornecedor Produto', 'Forn Produto', 'FornProduto', 'Forn. de Produto'],
+      'Forn. Serviço':            ['Fornecedor Servico', 'Forn Servico', 'FornServico', 'Forn. de Serviço', 'Forn. Servico'],
+      'Forn. Transporte':         ['Fornecedor Transporte', 'Forn Transporte', 'FornTransporte', 'Forn. de Transporte'],
+      'Observação':               ['Obs', 'Observacao', 'obs', 'Notas', 'Nota'],
     },
     addressColumns: ['CEP', 'Logradouro', 'Número', 'Complemento', 'Bairro', 'Referência', 'Cidade', 'Estado'],
   },
@@ -133,74 +94,40 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     skipRows: 0,
     requiredColumns: ['Código', 'Descrição do produto', 'Preço Venda', 'Ativo'],
     cellRules: {
-      'Código':        'numbers',
-      'CEST':          'text',
-      'NCM':           'text',
-      'CSOSN':         'text',
-      'Qtd. Estoque':  'stock',
-      'Preço Custo':   'currency',
-      'Preço Venda':   'currency',
-      'Data Cadastro': 'date',
-      'Validade':      'date',
-      'Ativo':         'binary',
-      'Balança':       'binary',
+      'Código':           'numbers',
+      'CEST':             'text',
+      'NCM':              'text',
+      'CSOSN':            'text',
+      'Qtd. Estoque':     'stock',
+      'Preço Custo':      'currency',
+      'Preço Venda':      'currency',
+      'Data Cadastro':    'date',
+      // Validade = dias após emissão da etiqueta (inteiro), NÃO uma data
+      'Validade':         'numbers',
+      'Ativo':            'binary',
+      'Balança':          'binary',
+      'Balança Checkout': 'binary',
+      'Grupo Tributário': 'numbers'
     },
-    leadingZeroColumns: ['CEST', 'NCM'],
+    // CSOSN adicionado: pode começar com zero, deve estar como Texto no Excel
+    leadingZeroColumns: ['CEST', 'NCM', 'CSOSN'],
     unitColumn: 'Unidade',
     columnAliases: {
-      'Código': [
-        'Cod', 'Cod.', 'COD', 'codigo', 'Codigo', 'CODIGO', 'ID', 'id',
-        'Cod Produto', 'CodProduto', 'Codigo Produto', 'CodigoProduto',
-        'Cod. Produto', 'ID Produto',
-      ],
-      'Descrição do produto': [
-        // Variações de capitalização
-        'Descrição do Produto', 'Descricao do Produto', 'descricao do produto',
-        'DESCRICAO DO PRODUTO', 'Descrição Do Produto',
-        // Abreviações
-        'Descrição', 'Descricao', 'DESCRICAO', 'Desc', 'DESC',
-        // Sinônimos
-        'Produto', 'PRODUTO', 'Nome', 'NOME', 'Nome Produto',
-        'NomeProduto', 'Desc Produto', 'DescProduto',
-        // Com ponto
-        'Descr.', 'Desc.',
-      ],
-      'Preço Venda': [
-        'Preco Venda', 'PRECO VENDA', 'PrecoVenda', 'preco_venda',
-        'Preço de Venda', 'Preco de Venda', 'Vlr Venda', 'Valor Venda',
-        'Venda', 'VENDA', 'Prç Venda', 'PVenda',
-      ],
-      'Ativo': [
-        'ativo', 'ATIVO', 'Ativo?', 'Status', 'STATUS',
-        'Situacao', 'Situação', 'SITUACAO', 'Ativo (0/1)',
-        'Habilitado', 'Enabled', 'Activo',
-      ],
-      'CEST':  ['cest', 'CEST', 'Cest'],
-      'NCM':   ['ncm', 'NCM', 'Ncm', 'Codigo NCM', 'Cod NCM', 'CodNCM'],
-      'CSOSN': ['csosn', 'CSOSN', 'Csosn', 'CRT', 'crt', 'CRT/CSOSN'],
-      'Qtd. Estoque': [
-        'Qtd Estoque', 'QTD ESTOQUE', 'Qtd. Estoque', 'QtdEstoque',
-        'Quantidade', 'QUANTIDADE', 'Estoque', 'ESTOQUE',
-        'Qtd', 'QTD', 'Saldo', 'Saldo Estoque',
-      ],
-      'Preço Custo': [
-        'Preco Custo', 'PRECO CUSTO', 'PrecoCusto', 'preco_custo',
-        'Custo', 'CUSTO', 'Vlr Custo', 'Valor Custo', 'PCusto',
-        'Preço de Custo', 'Preco de Custo',
-      ],
-      'Data Cadastro': [
-        'Dt Cadastro', 'DT CADASTRO', 'Data de Cadastro', 'DataCadastro',
-        'Dt Cad', 'cadastro',
-      ],
-      'Validade': [
-        'Dt Validade', 'DT VALIDADE', 'Data Validade', 'Vencimento',
-        'DataValidade', 'Dt Venc', 'Validade Produto',
-      ],
-      'Unidade': [
-        'Unid', 'UNID', 'unidade', 'UNIDADE', 'Un', 'UN', 'UND', 'und',
-        'Unid Medida', 'Unidade Medida',
-      ],
-      'Balança': ['Balanca', 'BALANCA', 'BALANÇA', 'balanca', 'balança'],
+      'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo', 'ID'],
+      'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto', 'Nome'],
+      'CEST':                 ['cest', 'Cest'],
+      'NCM':                  ['ncm', 'Ncm', 'Codigo NCM', 'Cod NCM'],
+      'CSOSN':                ['csosn', 'Csosn', 'CRT', 'crt'],
+      'Qtd. Estoque':         ['Qtd Estoque', 'Quantidade', 'Estoque', 'Qtd'],
+      'Preço Custo':          ['Preco Custo', 'Custo', 'preco_custo'],
+      'Preço Venda':          ['Preco Venda', 'Venda', 'preco_venda'],
+      'Data Cadastro':        ['Dt Cadastro', 'Data de Cadastro'],
+      'Validade':             ['Dt Validade', 'Dias Validade', 'Dias Val'],
+      'Unidade':              ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
+      'Ativo':                ['ativo', 'Status'],
+      'Balança':              ['Balanca', 'balanca'],
+      'Grupo tributário':      ['Código Grupo Tributário', 'Tributação', 'grupo tributario', 'grupo tributário'],
+      'Balança Checkout':     ['Balanca Checkout', 'BalancaCheckout', 'Checkout'],
     },
   },
 
@@ -212,53 +139,29 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'ProdutoId':  'numbers',
       'EmpresaId':  'numbers',
       'Qtd':        'stock',
+      'QtdMin':     'stock',
       'Estoque':    'stock',
       'PrecoCusto': 'currency',
+      'Custo':      'currency',
+      'Preco':      'currency',
       'PrecoVenda': 'currency',
       'Margem':     'currency',
       'Desconto':   'currency',
     },
     unitColumn: 'Unidade',
     columnAliases: {
-      'ProdutoId': [
-        'Produto Id', 'produto_id', 'ID Produto', 'Id Produto',
-        'Codigo Produto', 'CodigoProduto', 'Cod Produto', 'CodProduto',
-        'Produto_Id', 'PRODUTOID', 'product_id', 'ProductId',
-      ],
-      'EmpresaId': [
-        'Empresa Id', 'empresa_id', 'ID Empresa', 'Id Empresa',
-        'Codigo Empresa', 'CodigoEmpresa', 'Cod Empresa', 'CodEmpresa',
-        'Empresa_Id', 'EMPRESAID', 'company_id',
-      ],
-      'Qtd': [
-        'Quantidade', 'QUANTIDADE', 'Qtd.', 'qtd', 'QTD',
-        'Qtd Estoque', 'QtdEstoque', 'Saldo',
-      ],
-      'Estoque': [
-        'Saldo Estoque', 'SaldoEstoque', 'Saldo', 'SALDO',
-        'Estoque Atual', 'EstoqueAtual', 'ESTOQUE',
-      ],
-      'PrecoCusto': [
-        'Preço Custo', 'Preco Custo', 'PRECO CUSTO', 'preco_custo',
-        'Custo', 'CUSTO', 'Preco de Custo', 'Preço de Custo',
-        'Vlr Custo', 'Valor Custo',
-      ],
-      'PrecoVenda': [
-        'Preço Venda', 'Preco Venda', 'PRECO VENDA', 'preco_venda',
-        'Venda', 'VENDA', 'Preco de Venda', 'Preço de Venda',
-        'Vlr Venda', 'Valor Venda',
-      ],
-      'Margem': [
-        'Margem (%)', 'Margem Lucro', 'margem', 'MARGEM',
-        'Margem %', 'Margem Bruta', 'Markup',
-      ],
-      'Desconto': [
-        'Desconto (%)', 'Desc', 'DESC', 'desconto', 'DESCONTO',
-        'Desconto %', 'Vlr Desconto',
-      ],
-      'Unidade': [
-        'Unid', 'UNID', 'unidade', 'UNIDADE', 'Un', 'UN', 'UND', 'und',
-      ],
+      'ProdutoId':  ['Produto Id', 'produto_id', 'ID Produto', 'Codigo Produto', 'CodigoProduto'],
+      'EmpresaId':  ['Empresa Id', 'empresa_id', 'ID Empresa', 'Codigo Empresa', 'CodigoEmpresa'],
+      'Qtd':        ['Quantidade', 'Qtd.', 'qtd', 'Qtd Estoque', 'QTD'],
+      'QtdMin':     ['Qtd Min', 'Qtd. Min', 'Qtd Minima', 'Estoque Minimo', 'EstoqueMin'],
+      'Estoque':    ['Saldo Estoque', 'Saldo', 'Estoque Atual'],
+      'PrecoCusto': ['Preço Custo', 'Preco Custo', 'preco_custo'],
+      'Custo':      ['CustoUnit', 'Custo Unitario'],
+      'Preco':      ['Preço', 'preco', 'Preco Base'],
+      'PrecoVenda': ['Preço Venda', 'Preco Venda', 'preco_venda', 'Venda', 'Preco de Venda', 'Preço de Venda'],
+      'Margem':     ['Margem (%)', 'Margem Lucro', 'margem'],
+      'Desconto':   ['Desconto (%)', 'Desc', 'desconto'],
+      'Unidade':    ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
     },
   },
 
@@ -270,55 +173,25 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     cellRules: {
       'Código da Pessoa':   'numbers',
       'Código da Empresa':  'numbers',
+      // Contas a Pagar → vírgula como separador decimal
       'Valor':              'currency',
+      'Desconto':           'currency',
       'Carência':           'numbers',
       'Juros':              'juros',
       'Multa':              'juros',
-      'Desconto':           'currency',
       'Data da Emissão':    'date',
       'Data de Vencimento': 'date',
     },
     columnAliases: {
-      'Código da Pessoa': [
-        'Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id',
-        'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa', 'CODIGO PESSOA',
-        'Cod. Pessoa', 'ID do Fornecedor', 'ID Fornecedor',
-      ],
-      'Código da Empresa': [
-        'Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id',
-        'empresa_id', 'CodigoEmpresa', 'Codigo Empresa', 'CODIGO EMPRESA',
-        'Cod. Empresa',
-      ],
-      'Valor': [
-        'Valor Total', 'ValorTotal', 'Vl Total', 'VlTotal',
-        'Vl.', 'VALOR', 'valor', 'Valor da Conta',
-        'Valor Nominal', 'Vlr', 'VLR',
-      ],
-      'Carência': [
-        'Carencia', 'CARENCIA', 'Dias Carência', 'Dias Carencia',
-        'Carência (dias)', 'DiasCarencia',
-      ],
-      'Juros': [
-        'Juros (%)', 'JUROS', 'juros', 'Taxa Juros', 'TaxaJuros',
-        'Juro', 'Taxa de Juros',
-      ],
-      'Multa': [
-        'Multa (%)', 'MULTA', 'multa', 'Taxa Multa', 'TaxaMulta',
-        'Taxa de Multa',
-      ],
-      'Desconto': [
-        'Desc', 'DESC', 'desconto', 'DESCONTO', 'Desconto (%)',
-        'Vlr Desconto', 'Valor Desconto',
-      ],
-      'Data da Emissão': [
-        'Dt Emissão', 'Dt Emissao', 'Emissão', 'Emissao', 'EMISSAO',
-        'Data Emissao', 'DataEmissao', 'Data de Emissão', 'DtEmissao',
-      ],
-      'Data de Vencimento': [
-        'Dt Vencimento', 'DtVencimento', 'Vencimento', 'VENCIMENTO',
-        'Data Vencimento', 'DataVencimento', 'Dt Venc', 'DtVenc',
-        'Dt. Vencimento',
-      ],
+      'Código da Pessoa':   ['Pessoa', 'Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa':  ['Empresa', 'Emp', 'Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
+      'Valor':              ['Valor Total', 'Vl Total', 'Vl. Total'],
+      'Carência':           ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':              ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':              ['Multa (%)', 'Taxa Multa'],
+      'Desconto':           ['Desc', 'Desconto (%)'],
+      'Data da Emissão':    ['Dt Emissão', 'Emissão', 'Data Emissao'],
+      'Data de Vencimento': ['Dt Vencimento', 'Vencimento', 'Dt Venc'],
     },
   },
 
@@ -330,56 +203,34 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     cellRules: {
       'Código da Pessoa':  'numbers',
       'Código da Empresa': 'numbers',
-      'Valor em Aberto':   'currency',
-      'Valor Quitado':     'currency',
+      // Contas a Receber → PONTO como separador decimal (currency_dot)
+      'Valor em Aberto':   'currency_dot',
+      'Valor Quitado':     'currency_dot',
       'Carência':          'numbers',
       'Juros':             'juros',
       'Multa':             'juros',
-      'Desconto':          'currency',
+      'Desconto':          'currency_dot',
       'Data de Emissão':   'date',
       'Vencimento':        'date',
       'Recebimento':       'date',
     },
     columnAliases: {
-      'Código da Pessoa': [
-        'Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id',
-        'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa', 'CODIGO PESSOA',
-        'Cod. Pessoa', 'ID Cliente', 'ID do Cliente',
-      ],
-      'Código da Empresa': [
-        'Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id',
-        'empresa_id', 'CodigoEmpresa', 'Codigo Empresa', 'CODIGO EMPRESA',
-      ],
-      'Valor em Aberto': [
-        'Vl Aberto', 'VlAberto', 'Saldo', 'SALDO', 'Valor Aberto',
-        'ValorAberto', 'VALOR EM ABERTO', 'Saldo Devedor', 'Valor a Receber',
-      ],
-      'Valor Quitado': [
-        'Vl Quitado', 'VlQuitado', 'Quitado', 'QUITADO',
-        'Valor Pago', 'ValorPago', 'Pago',
-      ],
-      'Carência': [
-        'Carencia', 'CARENCIA', 'Dias Carência', 'Dias Carencia',
-        'Carência (dias)', 'DiasCarencia',
-      ],
-      'Juros':   ['Juros (%)', 'JUROS', 'juros', 'Taxa Juros', 'Juro'],
-      'Multa':   ['Multa (%)', 'MULTA', 'multa', 'Taxa Multa'],
-      'Desconto':['Desc', 'DESC', 'desconto', 'DESCONTO', 'Desconto (%)'],
-      'Data de Emissão': [
-        'Dt Emissão', 'Dt Emissao', 'Emissão', 'Emissao', 'EMISSAO',
-        'Data Emissao', 'Data da Emissão', 'DtEmissao',
-      ],
-      'Vencimento': [
-        'Dt Vencimento', 'DtVencimento', 'Data Vencimento', 'DataVencimento',
-        'Dt Venc', 'DtVenc', 'Data de Vencimento',
-      ],
-      'Recebimento': [
-        'Dt Recebimento', 'DtRecebimento', 'Data Recebimento',
-        'DataRecebimento', 'Dt Rec', 'DtRec', 'Data de Recebimento',
-      ],
+      'Código da Pessoa':  ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
+      'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
+      'Valor em Aberto':   ['Vl Aberto', 'Saldo', 'Valor Aberto'],
+      'Valor Quitado':     ['Vl Quitado', 'Quitado', 'Valor Pago'],
+      'Carência':          ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Juros':             ['Juros (%)', 'Taxa Juros', 'Juro'],
+      'Multa':             ['Multa (%)', 'Taxa Multa'],
+      'Desconto':          ['Desc', 'Desconto (%)'],
+      'Data de Emissão':   ['Dt Emissão', 'Emissão', 'Data Emissao'],
+      'Vencimento':        ['Dt Vencimento', 'Data Vencimento', 'Dt Venc'],
+      'Recebimento':       ['Dt Recebimento', 'Data Recebimento', 'Dt Rec'],
     },
   },
 };
+
+// ─── Validators ───────────────────────────────────────────────────────────────
 
 export const VALIDATORS: Record<CellRule, {
   test: (val: string) => boolean;
@@ -396,21 +247,39 @@ export const VALIDATORS: Record<CellRule, {
     label: 'Apenas Números Inteiros',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral"',
   },
+
   date: {
     test: (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val.trim()),
     label: 'Data (AAAA-MM-DD)',
     numberAsTextLabel: '',
   },
+
+  // Contas a Pagar + Produtos — separador decimal: VÍRGULA
   currency: {
-    test: (val: string) => /^\d+([.,]\d+)?$/.test(val.trim()),
-    label: 'Moeda (sem R$)',
-    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda"',
+    test: (val: string) => {
+      const trimmed = val.trim();
+      return /^\d+([,.]?\d+)?$/.test(trimmed);
+    },
+    label: 'Moeda com vírgula decimal (ex: 1250,99) — sem R$',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda" (decimais com vírgula)',
   },
+
+  // Contas a Receber — separador decimal: PONTO
+  currency_dot: {
+    test: (val: string) => {
+      const trimmed = val.trim();
+      return /^\d+([.]?\d+)?$/.test(trimmed);
+    },
+    label: 'Moeda com ponto decimal (ex: 1250.99) — sem R$',
+    numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda" (decimais com ponto)',
+  },
+
   binary: {
     test: (val: string) => /^[01]$/.test(val.trim()),
     label: 'Binário (0 ou 1)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (apenas 0 ou 1)',
   },
+
   juros: {
     test: (val: string) => {
       const trimmed = val.trim();
@@ -425,6 +294,7 @@ export const VALIDATORS: Record<CellRule, {
     label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (ex: 10,50)',
   },
+
   stock: {
     test: (val: string) => {
       const trimmed = val.trim();
@@ -434,6 +304,7 @@ export const VALIDATORS: Record<CellRule, {
     label: 'Quantidade (inteiro, pode ser negativo)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Número" (inteiros, pode ser negativo)',
   },
+
   text: {
     test: (val: string) => val.trim().length > 0,
     label: 'Texto (formato Texto no Excel — preserva zeros à esquerda)',

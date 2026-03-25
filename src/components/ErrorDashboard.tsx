@@ -1,8 +1,20 @@
+// src/components/ErrorDashboard.tsx
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp, Hash, HelpCircle, AlertOctagon, Percent, MessageSquare, MapPin } from 'lucide-react';
+import {
+  XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp,
+  Hash, HelpCircle, AlertOctagon, MessageSquare, EyeOff, Ban,
+} from 'lucide-react';
 import type { ValidationResult, CellError, CellErrorDetail } from '@/lib/validateFile';
-import { NUMBER_AS_TEXT_PREFIX, LEADING_ZERO_LABEL, DATE_AS_SERIAL_LABEL, DATE_WRONG_FORMAT_LABEL, INSTRUCTION_ROW_LABEL } from '@/lib/validateFile';
+import {
+  NUMBER_AS_TEXT_PREFIX,
+  LEADING_ZERO_LABEL,
+  DATE_AS_SERIAL_LABEL,
+  DATE_WRONG_FORMAT_LABEL,
+  INSTRUCTION_ROW_LABEL,
+  INVALID_CHAR_LABEL,
+  INVISIBLE_CHAR_LABEL,
+} from '@/lib/validateFile';
 import type { CellRule } from '@/lib/validationRules';
 import HelpModal from './Helpmodal.tsx';
 import ClientMessageModal from './ClientMessagemodal.tsx';
@@ -34,10 +46,7 @@ function groupCellErrors(errors: CellError[]): GroupedCellError[] {
     const g = map.get(key)!;
     g.columns.push(e.column);
     g.failCount += e.failCount;
-    // ✅ CORREÇÃO: push(...spread) causa stack overflow com arrays grandes.
-    // Usar concat() em vez de push(...array) para evitar o limite de argumentos do JS.
-    const mapped = e.details.map(d => ({ ...d, colName: d.colName ?? e.column }));
-    g.details = g.details.concat(mapped);
+    g.details.push(...e.details.map(d => ({ ...d, colName: d.colName ?? e.column })));
   }
 
   for (const g of map.values()) {
@@ -47,23 +56,56 @@ function groupCellErrors(errors: CellError[]): GroupedCellError[] {
   return [...map.values()];
 }
 
+// ─── Ícone e cor por tipo de erro ─────────────────────────────────────────────
+
+function getErrorStyle(group: GroupedCellError): {
+  icon: React.ReactNode;
+  bgColor: string;
+  iconColor: string;
+  badgeColor: string;
+} {
+  if (group.ruleLabel === INVALID_CHAR_LABEL) {
+    return {
+      icon: <Ban className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: 'hsl(0 72% 51%)' }} />,
+      bgColor: 'hsl(0 72% 51% / 0.10)',
+      iconColor: 'hsl(0 72% 51%)',
+      badgeColor: 'hsl(0 72% 51% / 0.12)',
+    };
+  }
+  if (group.ruleLabel === INVISIBLE_CHAR_LABEL) {
+    return {
+      icon: <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: 'hsl(270 60% 38%)' }} />,
+      bgColor: 'hsl(270 60% 38% / 0.10)',
+      iconColor: 'hsl(270 60% 38%)',
+      badgeColor: 'hsl(270 60% 38% / 0.12)',
+    };
+  }
+  // default — warning amarelo
+  return {
+    icon: <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: 'hsl(var(--warning))' }} />,
+    bgColor: 'hsl(var(--warning) / 0.10)',
+    iconColor: 'hsl(var(--warning))',
+    badgeColor: 'hsl(var(--warning) / 0.12)',
+  };
+}
+
 // ─── Componente de linha agrupada ─────────────────────────────────────────────
 
 function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const isNumberAsText  = group.ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX);
-  const isDateSerial    = group.ruleLabel === DATE_AS_SERIAL_LABEL;
-  const isDateWrong     = group.ruleLabel === DATE_WRONG_FORMAT_LABEL;
-  const isJurosRule     = group.rule === 'juros';
-  const isLeadingZero   = group.ruleLabel === LEADING_ZERO_LABEL;
-  const showHelp        = isNumberAsText || isDateSerial || isDateWrong || isJurosRule || isLeadingZero;
+  const isNumberAsText = group.ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX);
+  const isDateSerial   = group.ruleLabel === DATE_AS_SERIAL_LABEL;
+  const isDateWrong    = group.ruleLabel === DATE_WRONG_FORMAT_LABEL;
+  const isJurosRule    = group.rule === 'juros';
+  const isLeadingZero  = group.ruleLabel === LEADING_ZERO_LABEL;
+  const showHelp       = isNumberAsText || isDateSerial || isDateWrong || isJurosRule || isLeadingZero;
 
   const multiColumn = group.columns.length > 1;
-  const title = multiColumn
-    ? `${group.columns.length} colunas com este erro`
-    : group.columns[0];
+  const title = multiColumn ? `${group.columns.length} colunas com este erro` : group.columns[0];
+
+  const { icon, bgColor, iconColor, badgeColor } = getErrorStyle(group);
 
   return (
     <>
@@ -85,8 +127,11 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
           onClick={() => setExpanded(!expanded)}
           className="w-full flex items-start sm:items-center gap-3 p-3 sm:p-4 text-left hover:bg-muted/40 transition-colors"
         >
-          <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-warning/10 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-            <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: 'hsl(var(--warning))' }} />
+          <div
+            className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 sm:mt-0"
+            style={{ background: bgColor }}
+          >
+            {icon}
           </div>
 
           <div className="flex-1 min-w-0">
@@ -98,7 +143,7 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
                   <span
                     key={col}
                     className="inline-block rounded-md px-2 py-0.5 text-xs font-medium"
-                    style={{ background: 'hsl(var(--warning) / 0.12)', color: 'hsl(var(--warning))' }}
+                    style={{ background: badgeColor, color: iconColor }}
                   >
                     {col}
                   </span>
@@ -135,12 +180,16 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
               </button>
             )}
             <span className="error-badge">{group.failCount} erro{group.failCount > 1 ? 's' : ''}</span>
+            {expanded
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </div>
 
-          {expanded
-            ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
-            : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
-          }
+          <div className="sm:hidden shrink-0 mt-0.5">
+            {expanded
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </div>
         </button>
 
         <AnimatePresence>
@@ -149,34 +198,16 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.18 }}
               className="overflow-hidden"
             >
-              <div className="border-t border-border px-3 sm:px-4 py-3 max-h-64 overflow-y-auto">
-
-                {isJurosRule && (
-                  <div
-                    className="rounded-xl p-3 mb-3 flex gap-2.5"
-                    style={{ background: 'hsl(270 60% 38% / 0.06)', border: '1px solid hsl(270 60% 38% / 0.15)' }}
-                  >
-                    <Percent className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'hsl(270 60% 38%)' }} />
-                    <div className="space-y-1.5 min-w-0">
-                      <p className="text-xs font-semibold" style={{ color: 'hsl(270 60% 32%)' }}>Regra de formatação — Juros / Multa</p>
-                      <ul className="text-xs text-muted-foreground space-y-0.5 leading-relaxed">
-                        <li>• Até <strong>5 caracteres</strong> no total (ex: <code className="bg-muted px-1 rounded">10,50</code>)</li>
-                        <li>• Até <strong>2 casas decimais</strong>, separadas por <strong>vírgula</strong></li>
-                        <li>• Formatação da célula: <strong>Geral</strong></li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
+              <div className="border-t border-border px-3 sm:px-4 py-3 max-h-72 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-muted-foreground text-xs border-b border-border">
-                      <th className="text-left py-1.5 pr-4 font-medium w-14">Linha</th>
+                      <th className="text-left py-1.5 pr-4 font-medium w-16">Linha</th>
                       {multiColumn && (
-                        <th className="text-left py-1.5 pr-4 font-medium w-36">Coluna</th>
+                        <th className="text-left py-1.5 pr-4 font-medium w-32">Coluna</th>
                       )}
                       <th className="text-left py-1.5 font-medium">Valor encontrado</th>
                     </tr>
@@ -184,9 +215,9 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
                   <tbody>
                     {group.details.map((d, i) => (
                       <tr key={i} className="border-b border-border/50 last:border-0">
-                        <td className="py-1.5 pr-4 text-muted-foreground text-xs">{d.row}</td>
+                        <td className="py-1.5 pr-4 text-xs text-muted-foreground font-mono">{d.row}</td>
                         {multiColumn && (
-                          <td className="py-1.5 pr-4 text-xs font-medium" style={{ color: 'hsl(var(--warning))' }}>
+                          <td className="py-1.5 pr-4 text-xs text-muted-foreground truncate max-w-[8rem]">
                             {d.colName ?? ''}
                           </td>
                         )}
@@ -229,12 +260,12 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
     );
   }
 
-  const totalCellErrors  = result.cellErrors.reduce((sum, e) => sum + e.failCount, 0);
-  const grouped          = groupCellErrors(
+  const totalCellErrors = result.cellErrors.reduce((sum, e) => sum + e.failCount, 0);
+  const grouped = groupCellErrors(
     result.cellErrors.filter(e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada'))
   );
-  const moradaErrors     = result.cellErrors.filter(e => e.column.includes('morada'));
-  const instrError       = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+  const moradaErrors = result.cellErrors.filter(e => e.column.includes('morada'));
+  const instrError   = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
@@ -253,79 +284,21 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
               A <strong>linha 2</strong> parece conter textos de orientação de preenchimento, não dados reais.
               Apague essa linha inteira antes de importar para que a validação funcione corretamente.
             </p>
-            <code className="mt-1.5 block text-xs bg-background rounded px-2 py-1 border border-border text-muted-foreground truncate">
-              {instrError.details[0]?.value}
-            </code>
           </div>
         </motion.div>
       )}
 
-      {moradaErrors.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl overflow-hidden border-2"
-          style={{ borderColor: 'hsl(18 90% 52%)' }}
-        >
-          <div className="flex items-center gap-2.5 px-4 py-3" style={{ background: 'hsl(18 90% 52%)' }}>
-            <MapPin className="h-4 w-4 text-white shrink-0" />
-            <p className="font-bold text-sm text-white tracking-wide">⚠️ REGRA DE ENDEREÇO — LEIA COM ATENÇÃO</p>
-          </div>
-          <div className="px-4 py-3 space-y-3" style={{ background: 'hsl(18 90% 52% / 0.06)' }}>
-            <p className="text-sm font-semibold text-foreground leading-relaxed">
-              Uma vez que <strong>qualquer campo de endereço</strong> for preenchido,{' '}
-              <span style={{ color: 'hsl(18 80% 40%)' }}>TODOS os campos se tornam obrigatórios</span> naquela linha.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {['CEP', 'LOGRADOURO', 'NÚMERO', 'COMPLEMENTO', 'BAIRRO', 'REFERÊNCIA', 'CIDADE', 'ESTADO'].map(field => (
-                <div
-                  key={field}
-                  className="rounded-lg px-2.5 py-1.5 text-center text-xs font-bold"
-                  style={{ background: 'hsl(18 90% 52%)', color: 'white' }}
-                >
-                  {field}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Preencha <strong>todos os campos acima</strong> nas linhas afetadas, ou deixe <strong>todos em branco</strong>.
-              Não é permitido preencher apenas alguns.{' '}
-              <span className="font-semibold" style={{ color: 'hsl(18 90% 42%)' }}>
-                Endereço incompleto faz o Velo salvar os dados como Observação em vez de endereço.
-              </span>
-            </p>
-          </div>
-        </motion.div>
-      )}
-
-      {result.cellErrors.some(e => e.rule === 'juros') && (
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border overflow-hidden"
-          style={{ borderColor: 'hsl(270 60% 38% / 0.25)', background: 'hsl(270 60% 38% / 0.04)' }}
-        >
-          <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'hsl(270 60% 38% / 0.15)', background: 'hsl(270 60% 38% / 0.08)' }}>
-            <Percent className="h-4 w-4 shrink-0" style={{ color: 'hsl(270 60% 38%)' }} />
-            <span className="text-sm font-bold font-heading" style={{ color: 'hsl(270 60% 38%)' }}>Regra para Juros e Multa</span>
-          </div>
-          <div className="px-4 py-3 space-y-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
-            <p>Apenas números com <strong>até 5 caracteres</strong> e <strong>até 2 casas decimais</strong>. Separe os decimais com <strong>vírgula</strong>.</p>
-            <p>Exemplos válidos: <code className="bg-muted rounded px-1">10,50</code> · <code className="bg-muted rounded px-1">5</code> · <code className="bg-muted rounded px-1">100,00</code></p>
-          </div>
-        </motion.div>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-        <div className="col-span-2 sm:col-span-1 rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft">
+      {/* Resumo */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft text-center">
           <p className="text-xs text-muted-foreground font-medium mb-1">Ficheiro</p>
-          <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{fileName}</p>
+          <p className="text-xs font-bold text-foreground truncate" title={fileName}>{fileName}</p>
         </div>
-        <div className="rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft">
+        <div className="rounded-xl bg-card border border-border p-3 sm:p-4 shadow-soft text-center">
           <p className="text-xs text-muted-foreground font-medium mb-1">Linhas</p>
           <p className="text-xl sm:text-2xl font-bold font-heading text-foreground">{result.rowCount}</p>
         </div>
-        <div className="rounded-xl bg-destructive/5 border border-destructive/20 p-3 sm:p-4 shadow-soft">
+        <div className="rounded-xl border p-3 sm:p-4 shadow-soft text-center" style={{ background: 'hsl(var(--destructive) / 0.05)', borderColor: 'hsl(var(--destructive) / 0.2)' }}>
           <p className="text-xs text-destructive font-medium mb-1">Total de erros</p>
           <p className="text-xl sm:text-2xl font-bold font-heading text-destructive">
             {result.columnErrors.length + totalCellErrors}
@@ -357,6 +330,33 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
             </div>
           </div>
         </div>
+      )}
+
+      {moradaErrors.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl p-4 flex gap-3 border"
+          style={{ background: 'hsl(18 90% 52% / 0.08)', borderColor: 'hsl(18 90% 52% / 0.3)' }}
+        >
+          <AlertOctagon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'hsl(18 90% 52%)' }} />
+          <div className="min-w-0">
+            <p className="font-bold text-sm text-foreground">Regra de endereço — campos incompletos</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              Quando qualquer campo de endereço é preenchido, <strong>todos</strong> são obrigatórios:
+              CEP, Logradouro, Número, Complemento, Bairro, Referência, Cidade e Estado.
+              Preencha todos ou deixe todos em branco.
+            </p>
+            <div className="flex flex-wrap gap-1 mt-2">
+              {moradaErrors.map((e, i) => (
+                <span key={i} className="inline-block rounded-md px-2 py-0.5 text-xs font-medium"
+                  style={{ background: 'hsl(18 90% 52% / 0.12)', color: 'hsl(18 90% 52%)' }}>
+                  {e.column.replace(' (morada incompleta)', '')}
+                </span>
+              ))}
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {grouped.length > 0 && (

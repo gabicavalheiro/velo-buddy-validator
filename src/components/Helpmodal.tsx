@@ -1,3 +1,4 @@
+// src/components/HelpModal.tsx
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle } from 'lucide-react';
 import type { CellRule } from '@/lib/validationRules';
@@ -25,7 +26,14 @@ function finalFormat(rule: CellRule): FinalFormat {
         name: 'Moeda',
         path: 'Página Inicial → Número → Moeda',
         example: 'Ex: 1.250,99',
-        note: 'O formato Moeda garante que os valores com casas decimais sejam reconhecidos corretamente na importação. Não digite "R$" manualmente.',
+        note: 'Valores com decimais devem usar VÍRGULA como separador (ex: 1250,99). Não digite "R$" manualmente.',
+      };
+    case 'currency_dot':
+      return {
+        name: 'Moeda',
+        path: 'Página Inicial → Número → Moeda',
+        example: 'Ex: 1250.99',
+        note: 'Nesta planilha (Contas a Receber), os valores devem usar PONTO como separador decimal (ex: 1250.99). Não use vírgula nem o símbolo "R$".',
       };
     case 'stock':
       return {
@@ -101,7 +109,6 @@ const stepsNumberAsText: Step[] = [
     },
   },
 ];
-
 
 const stepsLeadingZero: Step[] = [
   {
@@ -245,7 +252,8 @@ export default function HelpModal({ open, onClose, columnName, errorType, rule }
 
                 <ol className="space-y-3">
                   {steps.map((step, i) => {
-                    const stepTitle = typeof step.title === 'function' ? step.title(columnName, rule) : step.title;
+                    const stepTitle = typeof step.title === 'function'
+                      ? step.title(columnName, rule) : step.title;
                     return (
                       <li key={i} className="flex gap-3">
                         <div className="flex flex-col items-center gap-1 shrink-0">

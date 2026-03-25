@@ -1,3 +1,4 @@
+// src/components/ClientMessageModal.tsx
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, MessageSquare } from 'lucide-react';
@@ -11,6 +12,8 @@ import {
   DATE_WRONG_FORMAT_LABEL,
   INSTRUCTION_ROW_LABEL,
   REQUIRED_VALUE_LABEL,
+  INVALID_CHAR_LABEL,
+  INVISIBLE_CHAR_LABEL,
 } from '@/lib/validateFile';
 
 interface Props {
@@ -23,19 +26,21 @@ interface Props {
 
 function finalFormatLabel(rule: CellRule): string {
   switch (rule) {
-    case 'currency': return 'Moeda (2 casas decimais, sem R$)';
-    case 'juros':    return 'Geral';
-    case 'stock':    return 'Número (inteiro, pode ser negativo)';
+    case 'currency':     return 'Moeda (decimais com vírgula, sem R$)';
+    case 'currency_dot': return 'Moeda (decimais com ponto, sem R$)';
+    case 'juros':        return 'Geral';
+    case 'stock':        return 'Número (inteiro, pode ser negativo)';
     case 'numbers':
     case 'binary':
-    default:         return 'Geral';
+    default:             return 'Geral';
   }
 }
 
 function finalFormatPath(rule: CellRule): string {
   switch (rule) {
-    case 'currency': return 'Página Inicial → Número → Moeda';
-    default:         return 'Página Inicial → Número → Geral';
+    case 'currency':
+    case 'currency_dot': return 'Página Inicial → Número → Moeda';
+    default:             return 'Página Inicial → Número → Geral';
   }
 }
 
@@ -114,11 +119,42 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push('As datas estão num formato inválido (ex: 31/12/2024). O padrão exigido é *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos acima.');
       lines.push('');
 
-    // ← Usa rule === 'juros' em vez do label removido
     } else if (rule === 'juros') {
       lines.push('📊 *Formato de Juros/Multa incorreto*');
       lines.push(`Coluna(s): ${colList}`);
       lines.push('Os valores devem ter no máximo 3 dígitos inteiros e 2 casas decimais separadas por *vírgula* (ex: 10,50). A célula deve estar no formato *Geral* no Excel.');
+      lines.push('');
+
+    } else if (rule === 'currency_dot') {
+      lines.push('💰 *Formato de valor incorreto — Contas a Receber*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Nesta planilha, os valores devem usar *ponto* como separador decimal (ex: 1250.99). Não use vírgula nem o símbolo "R$".');
+      lines.push('Aplique o formato *Moeda* no Excel: *Página Inicial → Número → Moeda*.');
+      lines.push('');
+
+    } else if (rule === 'currency') {
+      lines.push('💰 *Formato de valor incorreto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Os valores devem usar *vírgula* como separador decimal (ex: 1250,99). Não use o símbolo "R$".');
+      lines.push('Aplique o formato *Moeda* no Excel: *Página Inicial → Número → Moeda*.');
+      lines.push('');
+
+    } else if (ruleLabel === INVALID_CHAR_LABEL) {
+      lines.push('🔡 *Caractere inválido encontrado*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Existem caracteres não permitidos pelo sistema (ex: aspas tipográficas "  ", travessão —, símbolo ©). Para corrigir:');
+      lines.push('  1. Localize as linhas indicadas no relatório');
+      lines.push('  2. Substitua os caracteres especiais pelas versões simples (ex: aspas retas " ", hífen -)');
+      lines.push('  ⚠️ Evite copiar texto diretamente do Word ou de páginas web, pois eles inserem esses caracteres automaticamente.');
+      lines.push('');
+
+    } else if (ruleLabel === INVISIBLE_CHAR_LABEL) {
+      lines.push('👻 *Caractere invisível encontrado*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Existem caracteres invisíveis nas células (ex: espaço não-separável, zero-width space). Eles não aparecem na tela mas causam erros na importação. Para corrigir:');
+      lines.push('  1. Localize as linhas indicadas no relatório');
+      lines.push('  2. Clique na célula, selecione todo o conteúdo (Ctrl+A) e redigite o valor manualmente');
+      lines.push('  ⚠️ Esses caracteres costumam vir de cópias de sites, PDFs ou sistemas externos.');
       lines.push('');
 
     } else if (ruleLabel === REQUIRED_VALUE_LABEL) {
@@ -131,7 +167,8 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push('🏠 *REGRA DE ENDEREÇO — ATENÇÃO*');
       lines.push('');
       lines.push('Não é permitido preencher apenas alguns campos de endereço.');
-      lines.push('⚠️ *Atenção:* endereço incompleto faz o Velo salvar os dados como Observação em vez de endereço.');      lines.push('');
+      lines.push('⚠️ *Atenção:* endereço incompleto faz o Velo salvar os dados como Observação em vez de endereço.');
+      lines.push('');
       lines.push('👉 *CEP* | *LOGRADOURO* | *NÚMERO* | *COMPLEMENTO* | *BAIRRO* | *REFERÊNCIA* | *CIDADE* | *ESTADO*');
       lines.push('');
       lines.push(`Nas linhas com erro (campo(s) vazio(s): ${colList}), preencha *todos* os campos acima ou deixe *todos* em branco.`);
