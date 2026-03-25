@@ -39,6 +39,22 @@ const INVISIBLE_CPS = new Set([
   0x3164, 0xFFA0, 0x115F, 0x1160,
 ]);
 
+// ─── Nomes amigáveis para caracteres invisíveis ───────────────────────────────
+const INVISIBLE_NAMES: Record<number, string> = {
+  0x00A0: 'NBSP',       // Non-Breaking Space
+  0x00AD: 'SHY',        // Soft Hyphen
+  0x202F: 'NNBSP',      // Narrow No-Break Space
+  0x205F: 'MMSP',       // Medium Mathematical Space
+  0x3000: 'IDSP',       // Ideographic Space
+  0x200B: 'ZWSP',       // Zero Width Space
+  0x200C: 'ZWNJ',       // Zero Width Non-Joiner
+  0x200D: 'ZWJ',        // Zero Width Joiner
+  0x200E: 'LRM',        // Left-to-Right Mark
+  0x200F: 'RLM',        // Right-to-Left Mark
+  0xFEFF: 'BOM',        // Byte Order Mark / Zero Width No-Break Space
+  0x2060: 'WJ',         // Word Joiner
+};
+
 interface CharScanResult {
   invalidChars:   string[];
   invisibleChars: string[];
@@ -61,6 +77,23 @@ function scanSpecialChars(val: string): CharScanResult {
   }
 
   return { invalidChars: [...invalid], invisibleChars: [...invisible] };
+}
+
+// ─── Marca caracteres invisíveis inline no texto ──────────────────────────────
+function markInvisibleChars(val: string): string {
+  let result = '';
+  for (const ch of val) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (INVISIBLE_CPS.has(cp) || cp < 0x20) {
+      const name = INVISIBLE_NAMES[cp];
+      result += name
+        ? `[${name}]`
+        : `[U+${cp.toString(16).toUpperCase().padStart(4, '0')}]`;
+    } else {
+      result += ch;
+    }
+  }
+  return result;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -194,14 +227,12 @@ function validateColumn(
     // ── Datas ────────────────────────────────────────────────────────────────
     if (rule === 'date') {
       if (raw instanceof Date) {
-        // cellDates: true — SheetJS entregou Date object
         const y  = raw.getFullYear();
         const m  = String(raw.getMonth() + 1).padStart(2, '0');
         const d2 = String(raw.getDate()).padStart(2, '0');
         const dateStr = `${y}-${m}-${d2}`;
         if (!VALIDATORS.date.test(dateStr)) d.dateFormat.push({ ...detail, value: dateStr });
       } else if (typeof raw === 'number') {
-        // Fallback: serial escapou (arquivo .xls antigo ou cellDates falhou)
         d.dateSerial.push({ ...detail, value: toDateStr(raw) });
       } else if (typeof raw === 'string') {
         if (!VALIDATORS.date.test(val)) d.dateFormat.push(detail);
@@ -217,7 +248,8 @@ function validateColumn(
 
     // ── Stock ────────────────────────────────────────────────────────────────
     if (rule === 'stock') {
-      const unit = unitColIdx != null ? String(rows[i][unitColIdx] ?? '').trim().toLowerCase() : '';
+      const unit = unitColIdx != null
+        ? String(rows[i][unitColIdx] ?? '').trim().toLowerCase() : '';
       const num  = Number(val);
       if (!Number.isFinite(num) || (!KG_ALIASES.has(unit) && !Number.isInteger(num))) d.invalid.push(detail);
       continue;
@@ -342,9 +374,12 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       }
 
       if (invisibleChars.length > 0) {
+        // Marca os caracteres invisíveis inline com seu nome/código
+        const marked = markInvisibleChars(raw.trim());
+        const markedPreview = marked.length > 80 ? marked.slice(0, 80) + '…' : marked;
         invisibleDetails.push({
           row: ri + 2 + config.skipRows,
-          value: `${preview}  →  ${invisibleChars.join(', ')}`,
+          value: markedPreview,
           colName: colLabel,
         });
       }
