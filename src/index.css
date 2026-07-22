@@ -45,12 +45,51 @@
     --shadow-glow: 0 0 40px -10px hsl(270 60% 38% / 0.25);
   }
 
+  /* Modo escuro — ativado adicionando a classe "dark" no <html> (feito via next-themes) */
+  .dark {
+    --background: 270 25% 9%;
+    --foreground: 220 20% 95%;
+    --card: 270 20% 13%;
+    --card-foreground: 220 20% 95%;
+    --popover: 270 20% 13%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 270 70% 68%;
+    --primary-foreground: 270 30% 10%;
+    --secondary: 270 15% 19%;
+    --secondary-foreground: 220 15% 90%;
+    --muted: 270 15% 17%;
+    --muted-foreground: 220 10% 65%;
+    --accent: 18 90% 60%;
+    --accent-foreground: 18 40% 10%;
+    --destructive: 0 65% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 145 50% 48%;
+    --success-foreground: 145 30% 8%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 38 40% 10%;
+    --border: 270 15% 22%;
+    --input: 270 15% 20%;
+    --ring: 270 70% 68%;
+    --sidebar-background: 270 22% 11%;
+    --sidebar-foreground: 220 15% 90%;
+    --sidebar-primary: 270 70% 68%;
+    --sidebar-primary-foreground: 270 30% 10%;
+    --sidebar-accent: 270 15% 19%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 270 15% 22%;
+    --sidebar-ring: 270 70% 68%;
+    --shadow-soft: 0 4px 20px -4px hsl(0 0% 0% / 0.35);
+    --shadow-card: 0 8px 30px -8px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 40px -10px hsl(270 70% 68% / 0.35);
+  }
+
   * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground font-body;
     min-height: 100vh;
     min-height: 100dvh;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   h1, h2, h3, h4 { @apply font-heading; }
@@ -67,5 +106,11 @@
   }
   .error-badge {
     @apply inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-inset ring-destructive/20 whitespace-nowrap;
+  }
+  .warning-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap;
+    background: hsl(var(--warning) / 0.12);
+    color: hsl(var(--warning));
+    box-shadow: inset 0 0 0 1px hsl(var(--warning) / 0.3);
   }
 }

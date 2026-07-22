@@ -3,12 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Users, Package, Grid3X3, CreditCard, TrendingDown,
   AlertTriangle, CheckCircle2, Info, ChevronDown, ChevronUp, Lightbulb,
+  Eraser, Copy, Check,
 } from 'lucide-react';
 
 interface GuideItem {
   label?: string;
-  text: string;
+  text?: string;
   warning?: boolean;
+  // Bloco de código (ex: macro VBA) — renderizado em monospace, com botão de copiar.
+  code?: string;
+  codeLabel?: string;
 }
 
 interface GuideSection {
@@ -18,6 +22,89 @@ interface GuideSection {
   title: string;
   items: GuideItem[];
 }
+
+// ─── Macros VBA — remoção/substituição de caracteres especiais e invisíveis ───
+
+const VBA_LIMPAR_CARACTERES = `Sub LimparCaracteresV2()
+    Dim ws As Worksheet
+    Dim cel As Range
+    Dim texto As String
+    Dim i As Integer
+    Dim novoTexto As String
+    Dim codigo As Integer
+    Dim c As String
+
+    ' Caracteres especiais que você quer remover, além dos invisíveis
+    Dim removerExtra As String
+    removerExtra = "()|%*&{}[]<>^~\`@#$+=""'"
+
+    Set ws = ActiveSheet
+    Application.ScreenUpdating = False
+
+    For Each cel In ws.UsedRange
+        If Not IsEmpty(cel.Value) And VarType(cel.Value) = vbString Then
+            texto = cel.Value
+            novoTexto = ""
+
+            For i = 1 To Len(texto)
+                c = Mid(texto, i, 1)
+                codigo = AscW(c)
+
+                If InStr(removerExtra, c) > 0 Then
+                    ' está na lista de remoção, descarta
+                ElseIf (codigo >= 32 And codigo <= 126) Or _
+                       (codigo >= 192 And codigo <= 255) Then
+                    novoTexto = novoTexto & c
+                ElseIf codigo = 32 Then
+                    novoTexto = novoTexto & " "
+                End If
+                ' qualquer outro código (invisível, controle) é descartado
+            Next i
+
+            Do While InStr(novoTexto, "  ") > 0
+                novoTexto = Replace(novoTexto, "  ", " ")
+            Loop
+            novoTexto = Trim(novoTexto)
+
+            If novoTexto <> texto Then
+                cel.Value = novoTexto
+            End If
+        End If
+    Next cel
+
+    Application.ScreenUpdating = True
+    MsgBox "Limpeza concluída!", vbInformation
+End Sub`;
+
+const VBA_SUBSTITUIR_INVISIVEIS = `Sub SubstituirPorEspacosReais()
+    Dim ws As Worksheet
+    Dim celula As Range
+    Dim texto As String
+
+    For Each ws In ThisWorkbook.Worksheets
+        For Each celula In ws.UsedRange
+            If celula.HasFormula = False And Not IsEmpty(celula.Value) Then
+                If VarType(celula.Value) = vbString Then
+                    texto = celula.Value
+                    texto = Replace(texto, Chr(160), " ")    ' espaço não separável (nbsp)
+                    texto = Replace(texto, Chr(9), " ")      ' tab
+                    texto = Replace(texto, ChrW(8203), " ")  ' zero-width space
+                    texto = Replace(texto, ChrW(65279), " ") ' BOM / zero-width no-break space
+                    texto = Replace(texto, ChrW(8194), " ")  ' en space
+                    texto = Replace(texto, ChrW(8195), " ")  ' em space
+                    texto = Replace(texto, ChrW(8201), " ")  ' thin space
+                    texto = Replace(texto, ChrW(12288), " ") ' espaço largo (ideográfico)
+
+                    If texto <> celula.Value Then
+                        celula.Value = texto
+                    End If
+                End If
+            End If
+        Next celula
+    Next ws
+
+    MsgBox "Todos os caracteres invisíveis foram substituídos por espaços reais!"
+End Sub`;
 
 const SECTIONS: GuideSection[] = [
   {
@@ -128,7 +215,70 @@ const SECTIONS: GuideSection[] = [
       },
     ],
   },
+  {
+    id: 'caracteresEspeciais',
+    icon: <Eraser className="h-4 w-4" />,
+    color: 'hsl(38 92% 46%)',
+    title: 'Caracteres Especiais e Invisíveis',
+    items: [
+      {
+        label: 'O que é',
+        text: 'Espaços não separáveis (NBSP), zero-width space, BOM e outros caracteres invisíveis costumam vir de textos colados de sites ou PDFs. Eles não aparecem na célula, mas quebram a importação silenciosamente.',
+      },
+      {
+        label: 'Como rodar um macro',
+        text: 'No Excel: Alt+F11 (abre o editor VBA) → Inserir > Módulo → cole o código abaixo → feche o editor → Alt+F8 → escolha o macro → Executar.',
+      },
+      {
+        codeLabel: 'Remover caracteres especiais (mantém letras, números, acentos e espaço)',
+        code: VBA_LIMPAR_CARACTERES,
+      },
+      {
+        codeLabel: 'Substituir caracteres invisíveis por espaço real',
+        code: VBA_SUBSTITUIR_INVISIVEIS,
+      },
+      {
+        warning: true,
+        text: 'Faça uma cópia de segurança da planilha antes de rodar o macro — a alteração é aplicada direto nas células e é salva junto com o arquivo.',
+      },
+    ],
+  },
 ];
+
+// ─── Bloco de código com botão de copiar ──────────────────────────────────────
+
+function CodeBlock({ code, label }: { code: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // clipboard indisponível — ignora silenciosamente
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden bg-muted/30">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b border-border">
+        {label && <p className="text-xs font-semibold text-foreground truncate pr-2">{label}</p>}
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium shrink-0 transition-colors hover:bg-muted"
+          style={{ color: copied ? 'hsl(145 55% 38%)' : 'hsl(270 60% 38%)' }}
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copiado!' : 'Copiar'}
+        </button>
+      </div>
+      <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-56 overflow-y-auto">
+        <code className="font-mono text-foreground whitespace-pre">{code}</code>
+      </pre>
+    </div>
+  );
+}
 
 interface SectionCardProps {
   section: GuideSection;
@@ -166,8 +316,11 @@ function SectionCard({ section }: SectionCardProps) {
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 pt-1 space-y-2.5 border-t border-border">
-              {section.items.map((item, i) => (
-                item.warning ? (
+              {section.items.map((item, i) => {
+                if (item.code) {
+                  return <CodeBlock key={i} code={item.code} label={item.codeLabel} />;
+                }
+                return item.warning ? (
                   <div
                     key={i}
                     className="flex gap-2 rounded-lg px-3 py-2"
@@ -186,8 +339,8 @@ function SectionCard({ section }: SectionCardProps) {
                       {item.text}
                     </p>
                   </div>
-                )
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         )}

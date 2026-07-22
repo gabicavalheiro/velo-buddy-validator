@@ -174,6 +174,12 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
       lines.push(`Nas linhas com erro (campo(s) vazio(s): ${colList}), preencha *todos* os campos acima ou deixe *todos* em branco.`);
       lines.push('');
 
+    } else if (ruleLabel.startsWith('Texto excede o limite de')) {
+      lines.push('📏 *Valor excede o tamanho do campo*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push(`${ruleLabel}. Reduza o texto nas células indicadas.`);
+      lines.push('');
+
     } else {
       const fmt = finalFormatLabel(rule);
       lines.push(`❌ *Valor inválido — ${fmt}*`);

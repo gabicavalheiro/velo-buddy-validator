@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp,
-  Hash, HelpCircle, AlertOctagon, MessageSquare, EyeOff, Ban,
+  Hash, HelpCircle, AlertOctagon, MessageSquare, EyeOff, Ban, Rows3,
 } from 'lucide-react';
 import type { ValidationResult, CellError, CellErrorDetail } from '@/lib/validateFile';
 import {
@@ -91,7 +91,7 @@ function getErrorStyle(group: GroupedCellError): {
 
 // ─── Componente de linha agrupada ─────────────────────────────────────────────
 
-function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index: number }) {
+function GroupedCellErrorRow({ group, index, isWarning }: { group: GroupedCellError; index: number; isWarning?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -106,6 +106,7 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
   const title = multiColumn ? `${group.columns.length} colunas com este erro` : group.columns[0];
 
   const { icon, bgColor, iconColor, badgeColor } = getErrorStyle(group);
+  const countLabel = isWarning ? 'aviso' : 'erro';
 
   return (
     <>
@@ -154,7 +155,9 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
             <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{group.ruleLabel}</p>
 
             <div className="flex flex-wrap items-center gap-2 mt-2 sm:hidden">
-              <span className="error-badge">{group.failCount} erro{group.failCount > 1 ? 's' : ''}</span>
+              <span className={isWarning ? 'warning-badge' : 'error-badge'}>
+                {group.failCount} {countLabel}{group.failCount > 1 ? 's' : ''}
+              </span>
               {showHelp && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setHelpOpen(true); }}
@@ -179,7 +182,9 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
                 Como corrigir?
               </button>
             )}
-            <span className="error-badge">{group.failCount} erro{group.failCount > 1 ? 's' : ''}</span>
+            <span className={isWarning ? 'warning-badge' : 'error-badge'}>
+              {group.failCount} {countLabel}{group.failCount > 1 ? 's' : ''}
+            </span>
             {expanded
               ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
               : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
@@ -222,7 +227,9 @@ function GroupedCellErrorRow({ group, index }: { group: GroupedCellError; index:
                           </td>
                         )}
                         <td className="py-1.5">
-                          <code className="text-xs bg-destructive/10 text-destructive rounded px-1.5 py-0.5">{d.value}</code>
+                          <code className={`text-xs rounded px-1.5 py-0.5 ${isWarning ? 'bg-[hsl(var(--warning)/0.12)] text-[hsl(var(--warning))]' : 'bg-destructive/10 text-destructive'}`}>
+                            {d.value}
+                          </code>
                         </td>
                       </tr>
                     ))}
@@ -244,31 +251,105 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
 
   if (!result) return null;
 
+  // Erros de célula "relevantes" para exibição — exclui a detecção de linha de
+  // instruções e os erros de morada, que já têm banners próprios abaixo.
+  const relevantCellErrors = result.cellErrors.filter(
+    e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada')
+  );
+
+  // Separação por severidade: 'warning' é só um alerta informativo (ex: coluna
+  // numérica que PODERIA perder um zero à esquerda) — não bloqueia a
+  // importação e por isso é mostrado numa seção própria, sempre visível,
+  // mesmo quando não há nenhum erro bloqueante (result.success === true).
+  const blockingCellErrors = relevantCellErrors.filter(e => e.severity !== 'warning');
+  const warningCellErrors  = relevantCellErrors.filter(e => e.severity === 'warning');
+
+  const totalBlockingCellErrors = blockingCellErrors.reduce((sum, e) => sum + e.failCount, 0);
+  const totalWarnings           = warningCellErrors.reduce((sum, e) => sum + e.failCount, 0);
+
+  const groupedErrors   = groupCellErrors(blockingCellErrors);
+  const groupedWarnings = groupCellErrors(warningCellErrors);
+
+  const moradaErrors = result.cellErrors.filter(e => e.column.includes('morada'));
+  const instrError   = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+
+  const ghostRowBanner = result.ghostRowCount > 0 && (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl p-4 flex gap-3 border"
+      style={{ background: 'hsl(210 80% 50% / 0.08)', borderColor: 'hsl(210 80% 50% / 0.3)' }}
+    >
+      <Rows3 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'hsl(210 80% 45%)' }} />
+      <div className="min-w-0">
+        <p className="font-bold text-sm text-foreground">
+          {result.ghostRowCount} linha{result.ghostRowCount > 1 ? 's' : ''} vazia{result.ghostRowCount > 1 ? 's' : ''} "fantasma" no final da planilha (ignorada{result.ghostRowCount > 1 ? 's' : ''} na validação)
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+          O Excel às vezes registra a planilha como tendo mais linhas do que os dados reais — geralmente por formatação
+          (cor, borda, formato de número) aplicada numa faixa vazia abaixo da última linha preenchida.
+        </p>
+        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+          <strong className="text-foreground">Para corrigir na origem:</strong> selecione as linhas abaixo da última com dado real,
+          clique com o botão direito e escolha <strong className="text-foreground">"Excluir linhas"</strong> (não apenas "Limpar conteúdo"),
+          depois salve. Alguns sistemas de importação leem a dimensão bruta do arquivo e podem processar essas linhas vazias mesmo assim.
+        </p>
+      </div>
+    </motion.div>
+  );
+
+  const warningsSection = groupedWarnings.length > 0 && (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" style={{ color: 'hsl(var(--warning))' }} />
+        <h3 className="font-bold font-heading text-foreground text-sm sm:text-base">
+          Avisos ({totalWarnings} em {groupedWarnings.length} coluna{groupedWarnings.length > 1 ? 's' : ''})
+        </h3>
+      </div>
+      <p className="text-xs sm:text-sm text-muted-foreground">
+        Não impedem a importação — apenas um alerta preventivo. Clica em cada item para ver os detalhes:
+      </p>
+      <div className="space-y-2">
+        {groupedWarnings.map((g, i) => (
+          <GroupedCellErrorRow key={i} group={g} index={i} isWarning />
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── Estado "sem erros bloqueantes" ────────────────────────────────────────
+  // Mesmo quando não há nenhum erro que impeça a importação, ainda mostramos
+  // os avisos (se houver), em vez de escondê-los atrás da tela de sucesso.
   if (result.success) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center py-10 text-center gap-3"
-      >
-        <div className="h-14 w-14 rounded-full bg-green-500/10 flex items-center justify-center">
-          <XCircle className="h-7 w-7 text-green-500" />
-        </div>
-        <h3 className="text-base sm:text-lg font-semibold font-heading text-foreground mb-1">Sem erros encontrados!</h3>
-        <p className="text-sm text-muted-foreground">O ficheiro <strong className="break-all">{fileName}</strong> passou em todas as validações.</p>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+        {ghostRowBanner}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center py-8 sm:py-10 text-center gap-3"
+        >
+          <div className="h-14 w-14 rounded-full bg-green-500/10 flex items-center justify-center">
+            <XCircle className="h-7 w-7 text-green-500" />
+          </div>
+          <h3 className="text-base sm:text-lg font-semibold font-heading text-foreground mb-1">
+            {groupedWarnings.length > 0 ? 'Sem erros bloqueantes!' : 'Sem erros encontrados!'}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            O ficheiro <strong className="break-all">{fileName}</strong> passou em todas as validações
+            {groupedWarnings.length > 0 ? ' — veja os avisos abaixo:' : '.'}
+          </p>
+        </motion.div>
+
+        {warningsSection}
       </motion.div>
     );
   }
 
-  const totalCellErrors = result.cellErrors.reduce((sum, e) => sum + e.failCount, 0);
-  const grouped = groupCellErrors(
-    result.cellErrors.filter(e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada'))
-  );
-  const moradaErrors = result.cellErrors.filter(e => e.column.includes('morada'));
-  const instrError   = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
-
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+
+      {ghostRowBanner}
 
       {instrError && (
         <motion.div
@@ -301,7 +382,7 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
         <div className="rounded-xl border p-3 sm:p-4 shadow-soft text-center" style={{ background: 'hsl(var(--destructive) / 0.05)', borderColor: 'hsl(var(--destructive) / 0.2)' }}>
           <p className="text-xs text-destructive font-medium mb-1">Total de erros</p>
           <p className="text-xl sm:text-2xl font-bold font-heading text-destructive">
-            {result.columnErrors.length + totalCellErrors}
+            {result.columnErrors.length + totalBlockingCellErrors}
           </p>
         </div>
       </div>
@@ -359,22 +440,24 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
         </motion.div>
       )}
 
-      {grouped.length > 0 && (
+      {groupedErrors.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Grid3X3 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" style={{ color: 'hsl(var(--warning))' }} />
             <h3 className="font-bold font-heading text-foreground text-sm sm:text-base">
-              Erros nas células ({totalCellErrors} em {result.cellErrors.filter(e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada')).length} coluna{result.cellErrors.length > 1 ? 's' : ''})
+              Erros nas células ({totalBlockingCellErrors} em {groupedErrors.length} coluna{groupedErrors.length > 1 ? 's' : ''})
             </h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground">Clica em cada item para ver os detalhes:</p>
           <div className="space-y-2">
-            {grouped.map((g, i) => (
+            {groupedErrors.map((g, i) => (
               <GroupedCellErrorRow key={i} group={g} index={i} />
             ))}
           </div>
         </div>
       )}
+
+      {warningsSection}
 
       <div className="flex justify-center pt-2 pb-1">
         <button

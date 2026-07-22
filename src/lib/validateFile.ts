@@ -4,25 +4,40 @@ import { FileTypeConfig, VALIDATORS, CellRule } from './validationRules';
 
 export interface ColumnError     { column: string }
 export interface CellErrorDetail { row: number; value: string; colName?: string }
+export type CellErrorSeverity = 'error' | 'warning';
 export interface CellError {
   column: string; rule: CellRule; ruleLabel: string;
   failCount: number; totalCount: number; details: CellErrorDetail[];
+  // 'warning'  → apenas um alerta informativo, não impede a importação (ex: coluna
+  //              armazenada como Número que PODERIA perder um zero à esquerda).
+  // 'error'    → problema real que precisa ser corrigido antes de importar.
+  // Ausente/undefined é tratado como 'error' (compatibilidade com código antigo).
+  severity: CellErrorSeverity;
 }
 export interface ValidationResult {
   success: boolean; columnErrors: ColumnError[];
   cellErrors: CellError[]; rowCount: number;
+  // Linhas "fantasma": o Excel registra a planilha como tendo mais linhas do
+  // que as que realmente têm dado (comum quando alguém aplica formatação —
+  // cor, borda, formato de número — numa faixa grande de células vazias).
+  // Essas linhas são descartadas na validação, mas alguns sistemas de
+  // importação leem a dimensão bruta do arquivo e acabam processando-as
+  // mesmo assim. ghostRowCount informa quantas foram detectadas e ignoradas.
+  ghostRowCount: number;
 }
 
 export const NUMBER_AS_TEXT_PREFIX   = 'Número armazenado como texto';
 export const DATE_AS_SERIAL_LABEL    = 'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 export const REQUIRED_VALUE_LABEL    = 'Campo obrigatório — esta coluna não pode ter linhas em branco';
 export const INSTRUCTION_ROW_LABEL   = 'A linha 2 parece conter instruções de preenchimento e não dados reais — apague essa linha antes de importar';
-export const LEADING_ZERO_LABEL      = 'Esta coluna deve estar formatada como "Texto" no Excel — valores numéricos perdem os zeros à esquerda (ex: CPF "04652781407" vira "4652781407")';
+export const LEADING_ZERO_LABEL      = 'Aviso: esta coluna está armazenada como Número no Excel. Isso só é um problema se algum valor começar com "0" — nesse caso, o zero à esquerda seria perdido (ex: CPF "04652781407" viraria "4652781407"). Se nenhum valor começa com zero, pode ignorar. Recomendado formatar como "Texto" para evitar o risco.';
 export const DATE_WRONG_FORMAT_LABEL = 'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 export const CHAR_LIMIT_LABEL        = (limit: number) => `Texto excede o limite de ${limit} caracteres permitidos`;
 
 export const INVALID_CHAR_LABEL   = 'Caractere inválido encontrado — remova ou substitua pelo equivalente comum (ex: aspas tipográficas, símbolos especiais)';
 export const INVISIBLE_CHAR_LABEL = 'Caractere invisível encontrado — pode causar falhas silenciosas na importação (ex: espaço não-separável, zero-width space, BOM)';
+export const FRACTIONAL_STOCK_UNIT_LABEL =
+  'Quantidade em estoque fracionada — quando a Unidade informada nessa linha é "Unidade" (UN), o estoque não pode ter casas decimais (ex: 10, não 10,5)';
 
 // ─── Whitelist de caracteres visíveis permitidos ──────────────────────────────
 const VISIBLE_ALLOWED_RE =
@@ -130,13 +145,27 @@ const wordKey = (s: string) =>
 
 const slugKey = (s: string) => normalize(s).replace(/[^a-z0-9]/g, '');
 
-const makeError = (column: string, rule: CellRule, ruleLabel: string, details: CellErrorDetail[], totalCount: number): CellError =>
-  ({ column, rule, ruleLabel, failCount: details.length, totalCount, details });
+const makeError = (
+  column: string, rule: CellRule, ruleLabel: string, details: CellErrorDetail[], totalCount: number,
+  severity: CellErrorSeverity = 'error',
+): CellError =>
+  ({ column, rule, ruleLabel, failCount: details.length, totalCount, details, severity });
 
 const primaryRule = (rule: CellRule | CellRule[]): CellRule =>
   Array.isArray(rule) ? rule[0] : rule;
 
-// ─── Resolução de colunas (5 estratégias) ─────────────────────────────────────
+// ─── Resolução de colunas (6 estratégias) ─────────────────────────────────────
+//
+// 1) Nome exato                 2) Nome normalizado (acentos/caixa/espaços)
+// 3) Alias configurado          4) "Word key" (palavras reordenadas)
+// 5) "Slug key" (tudo junto)    6) Contém — fallback: cabeçalho contém o nome
+//    canônico/alias como substring (ex: "Produto Ativo?", "Situação/Ativo",
+//    texto colado por caractere invisível residual etc.)
+//
+// A estratégia 6 só entra em ação para colunas que NÃO encontraram match nas
+// 5 estratégias exatas, e nunca reutiliza um índice já reivindicado por um
+// match exato de outra coluna — evita "roubar" a coluna errada quando há
+// nomes parecidos (ex: "Preço Custo" vs "Preço Venda").
 
 function resolveColumnIndices(headerRow: string[], config: FileTypeConfig): Map<string, number> {
   const norm    = headerRow.map(normalize);
@@ -152,24 +181,52 @@ function resolveColumnIndices(headerRow: string[], config: FileTypeConfig): Map<
     ...Object.keys(config.charLimits ?? {}),
   ]);
 
-  return new Map(
-    [...canonicals].flatMap(canonical => {
-      const normC  = normalize(canonical);
-      const wkeyC  = wordKey(canonical);
-      const skeyC  = slugKey(canonical);
-      const aliasC = aliases[canonical] ?? [];
+  const claimedExact = new Set<number>();
+  const resolved: [string, number][] = [];
+  const pendingContains: string[] = [];
 
-      let idx = -1;
+  for (const canonical of canonicals) {
+    const normC  = normalize(canonical);
+    const wkeyC  = wordKey(canonical);
+    const skeyC  = slugKey(canonical);
+    const aliasC = aliases[canonical] ?? [];
 
-      if (idx === -1) idx = headerRow.indexOf(canonical);
-      if (idx === -1) idx = norm.findIndex(h => h === normC);
-      if (idx === -1) idx = aliasC.reduce<number>((f, a) => f !== -1 ? f : norm.findIndex(h => h === normalize(a)), -1);
-      if (idx === -1) idx = wkeys.findIndex(w => w === wkeyC);
-      if (idx === -1) idx = skeys.findIndex(s => s === skeyC);
+    let idx = -1;
 
-      return idx !== -1 ? [[canonical, idx]] : [];
-    })
-  );
+    if (idx === -1) idx = headerRow.indexOf(canonical);
+    if (idx === -1) idx = norm.findIndex(h => h === normC);
+    if (idx === -1) idx = aliasC.reduce<number>((f, a) => f !== -1 ? f : norm.findIndex(h => h === normalize(a)), -1);
+    if (idx === -1) idx = wkeys.findIndex(w => w === wkeyC);
+    if (idx === -1) idx = skeys.findIndex(s => s === skeyC);
+
+    if (idx !== -1) {
+      resolved.push([canonical, idx]);
+      claimedExact.add(idx);
+    } else {
+      pendingContains.push(canonical);
+    }
+  }
+
+  // ── Estratégia 6: contains (apenas para quem sobrou sem match exato) ──────
+  for (const canonical of pendingContains) {
+    const skeyC      = slugKey(canonical);
+    const aliasSkeys = (aliases[canonical] ?? []).map(slugKey).filter(Boolean);
+
+    if (!skeyC && aliasSkeys.length === 0) continue;
+
+    const idx = skeys.findIndex((s, i) => {
+      if (!s || claimedExact.has(i)) return false;
+      if (skeyC && (s.includes(skeyC) || skeyC.includes(s))) return true;
+      return aliasSkeys.some(a => s.includes(a) || a.includes(s));
+    });
+
+    if (idx !== -1) {
+      resolved.push([canonical, idx]);
+      claimedExact.add(idx);
+    }
+  }
+
+  return new Map(resolved);
 }
 
 // ─── Detecção de linha de instruções ─────────────────────────────────────────
@@ -203,7 +260,10 @@ function detectInstructionRow(rows: unknown[][]): CellError | null {
 
 // ─── Validação de coluna ──────────────────────────────────────────────────────
 
-const KG_ALIASES = new Set(['kg','kilo','quilograma','quilogramas','kilograma','kilogramas']);
+// Valores da coluna "Unidade" que representam o tipo de medida "Unidade" (UN) —
+// é SOMENTE nesse caso que o estoque não pode ser fracionado. Qualquer outra
+// unidade (Kg, L, Cx, Pc de peso variável, etc.) pode ter casas decimais.
+const UNIDADE_TYPE_ALIASES = new Set(['un', 'und', 'unid', 'unidade']);
 
 function validateColumn(
   colName: string, rule: CellRule, colIdx: number,
@@ -212,7 +272,7 @@ function validateColumn(
 ): CellError[] {
   const validator = VALIDATORS[rule];
   const d: Record<string, CellErrorDetail[]> = {
-    invalid: [], numberText: [], leadingZero: [], dateSerial: [], dateFormat: [],
+    invalid: [], numberText: [], leadingZero: [], dateSerial: [], dateFormat: [], fractionalUnit: [],
   };
   let total = 0;
 
@@ -248,10 +308,21 @@ function validateColumn(
 
     // ── Stock ────────────────────────────────────────────────────────────────
     if (rule === 'stock') {
-      const unit = unitColIdx != null
-        ? String(rows[i][unitColIdx] ?? '').trim().toLowerCase() : '';
-      const num  = Number(val);
-      if (!Number.isFinite(num) || (!KG_ALIASES.has(unit) && !Number.isInteger(num))) d.invalid.push(detail);
+      const unitRaw = unitColIdx != null ? String(rows[i][unitColIdx] ?? '').trim() : '';
+      const unit    = unitRaw.toLowerCase();
+      const num     = Number(val);
+
+      if (!Number.isFinite(num)) { d.invalid.push(detail); continue; }
+
+      // Regra de negócio: fracionamento só é proibido quando a Unidade da
+      // linha é "Unidade" (UN). Para qualquer outra unidade (Kg, L, Cx, etc.),
+      // valores decimais são válidos.
+      if (UNIDADE_TYPE_ALIASES.has(unit) && !Number.isInteger(num)) {
+        d.fractionalUnit.push({
+          ...detail,
+          value: `${val}  →  Unidade: "${unitRaw || '—'}"`,
+        });
+      }
       continue;
     }
 
@@ -260,14 +331,15 @@ function validateColumn(
   }
 
   return ([
-    [d.invalid,     validator.label],
-    [d.numberText,  VALIDATORS[rule].numberAsTextLabel],
-    [d.leadingZero, LEADING_ZERO_LABEL],
-    [d.dateSerial,  DATE_AS_SERIAL_LABEL],
-    [d.dateFormat,  DATE_WRONG_FORMAT_LABEL],
-  ] as [CellErrorDetail[], string][])
+    [d.invalid,        validator.label,                'error'  ],
+    [d.numberText,     VALIDATORS[rule].numberAsTextLabel, 'warning'],
+    [d.leadingZero,    LEADING_ZERO_LABEL,              'warning'],
+    [d.dateSerial,     DATE_AS_SERIAL_LABEL,            'error'  ],
+    [d.dateFormat,     DATE_WRONG_FORMAT_LABEL,         'error'  ],
+    [d.fractionalUnit, FRACTIONAL_STOCK_UNIT_LABEL,     'error'  ],
+  ] as [CellErrorDetail[], string, CellErrorSeverity][])
     .filter(([details, label]) => details.length > 0 && label)
-    .map(([details, label]) => makeError(colName, rule, label, details, total));
+    .map(([details, label, severity]) => makeError(colName, rule, label, details, total, severity));
 }
 
 // ─── validateWorkbook ─────────────────────────────────────────────────────────
@@ -278,7 +350,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   const dataRows = allRows.slice(config.skipRows);
 
   if (!dataRows.length) return {
-    success: false, rowCount: 0, cellErrors: [],
+    success: false, rowCount: 0, cellErrors: [], ghostRowCount: 0,
     columnErrors: [{ column: '(Ficheiro vazio após ignorar linhas de cabeçalho)' }],
   };
 
@@ -289,9 +361,27 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   while (lastFilled >= 0 && !(rawRows[lastFilled] as unknown[]).some(v => String(v ?? '').trim())) lastFilled--;
   const rows = rawRows.slice(0, lastFilled + 1);
 
+  // "Linhas fantasma": a planilha registra mais linhas do que as que têm dado
+  // de fato (comum quando formatação — cor, borda, formato de número — é
+  // aplicada numa faixa grande de células vazias). São descartadas aqui, mas
+  // avisamos o usuário porque outros sistemas de importação podem não fazer
+  // esse mesmo descarte.
+  const ghostRowCount = rawRows.length - rows.length;
+
   const colMap   = resolveColumnIndices(headerRow, config);
   const instrErr = detectInstructionRow(rows);
-  if (instrErr) return { success: false, columnErrors: [], cellErrors: [instrErr], rowCount: rows.length - 1 };
+  if (instrErr) return { success: false, columnErrors: [], cellErrors: [instrErr], rowCount: rows.length - 1, ghostRowCount };
+
+  // Mapa reverso índice → nome canônico. Usado para que TODOS os tipos de erro
+  // (cellRules, número-como-texto, caractere inválido/invisível, limite de
+  // caracteres) se refiram à mesma coluna sempre com o mesmo rótulo — em vez de
+  // misturar o nome canônico configurado com o texto literal do cabeçalho da
+  // planilha (o que fazia "Descrição do produto" e "Descrição do Produto"
+  // aparecerem como se fossem colunas diferentes).
+  const idxToCanonical = new Map<number, string>();
+  for (const [name, idx] of colMap) idxToCanonical.set(idx, name);
+  const labelForCol = (ci: number): string =>
+    idxToCanonical.get(ci) ?? headerRow[ci] ?? `Coluna ${ci + 1}`;
 
   const columnErrors = config.requiredColumns
     .filter(col => !colMap.has(col))
@@ -316,7 +406,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
 
   for (let ci = 0; ci < headerRow.length; ci++) {
     if (checkedForNumText.has(ci)) continue;
-    const label   = headerRow[ci] || `Coluna ${ci + 1}`;
+    const label   = labelForCol(ci);
     const details = rows.flatMap((row, i) => {
       const raw = row[ci];
       return typeof raw === 'string' && /^-?\d+([.,]\d+)?$/.test(raw.trim())
@@ -326,7 +416,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     const rule = primaryRule((config.cellRules[label] as CellRule | CellRule[] | undefined) ?? 'numbers');
     cellErrors.push(makeError(label, rule,
       VALIDATORS[rule].numberAsTextLabel || VALIDATORS.numbers.numberAsTextLabel,
-      details, rows.length));
+      details, rows.length, 'warning'));
   }
 
   // ── Campos obrigatórios por linha ─────────────────────────────────────────
@@ -354,7 +444,7 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
 
   // ── Varredura universal: inválidos e invisíveis ───────────────────────────
   for (let ci = 0; ci < headerRow.length; ci++) {
-    const colLabel = headerRow[ci] || `Coluna ${ci + 1}`;
+    const colLabel = labelForCol(ci);
     const invalidDetails:   CellErrorDetail[] = [];
     const invisibleDetails: CellErrorDetail[] = [];
 
@@ -410,8 +500,10 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
     }
   }
 
+  const blockingCellErrors = cellErrors.filter(e => e.severity !== 'warning');
+
   return {
-    success: columnErrors.length === 0 && cellErrors.length === 0,
-    columnErrors, cellErrors, rowCount: rows.length,
+    success: columnErrors.length === 0 && blockingCellErrors.length === 0,
+    columnErrors, cellErrors, rowCount: rows.length, ghostRowCount,
   };
 }

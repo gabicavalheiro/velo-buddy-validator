@@ -34,6 +34,9 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     cellRules: {
       'Código':                   'numbers',
       'CPF/CNPJ':                 'text',
+      // PENDENTE (manual, item 1): o resumo do modelo cita "I.E" como obrigatória,
+      // mas a descrição detalhada diz que só "Isento I.E" é obrigatório.
+      // Mantido como NÃO obrigatório até confirmação do time responsável.
       'I.E':                      'text',
       'Isento I.E':               'binary',
       'Simples Nacional':         'binary',
@@ -94,30 +97,63 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     skipRows: 0,
     requiredColumns: ['Código', 'Descrição do produto', 'Preço Venda', 'Ativo'],
     cellRules: {
-      'Código':           'numbers',
-      'CEST':             'text',
-      'NCM':              'text',
-      'CSOSN':            'text',
-      'Qtd. Estoque':     'stock',
-      'Preço Custo':      'currency',
-      'Preço Venda':      'currency',
-      'Data Cadastro':    'date',
-      // Validade = dias após emissão da etiqueta (inteiro), NÃO uma data
-      'Validade':         'numbers',
-      'Ativo':            'binary',
-      'Balança':          'binary',
-      'Balança Checkout': 'binary',
-      'Grupo Tributário': 'numbers'
+      'Código':               'numbers',
+      // NOVO — coluna existia no manual e faltava no validador (até 13 caracteres
+      // por código, vários códigos separados por vírgula, limite de 300/célula).
+      'Código de barras':     'text',
+      'CEST':                 'text',
+      'NCM':                  'text',
+      'CSOSN':                'text',
+      // NOVO — "Origem": Somente números inteiros (não existia no validador).
+      'Origem':               'numbers',
+      'Qtd. Estoque':         'stock',
+      'Preço Custo':          'currency',
+      'Preço Venda':          'currency',
+      'Data Cadastro':        'date',
+      // Validade = quantidade de dias (inteiro), NÃO uma data.
+      // PENDENTE (manual, item 2): o modelo formata a coluna como Data (AAAA-MM-DD),
+      // mas a descrição diz que é uma quantidade de dias. Mantido como número
+      // até confirmação — se a resposta for "é data mesmo", trocar para 'date'.
+      'Validade':             'numbers',
+      'Ativo':                'binary',
+      'Balança':              'binary',
+      'Balança Checkout':     'binary',
+      // NOVO — "Grupo": texto livre (nome do grupo de produto), separado de
+      // "Grupo Tributário" (numérico). Ver PENDENTE abaixo (item 3).
+      'Grupo':                'text',
+      // PENDENTE (manual, item 3): "Código grupo" é numérico no modelo, mas a
+      // descrição fala em grupo TRIBUTÁRIO, não em grupo de produto. Mantido
+      // como campo separado de "Grupo" até confirmação de qual é qual.
+      'Grupo Tributário':     'numbers',
     },
-    // CSOSN adicionado: pode começar com zero, deve estar como Texto no Excel
+    // CSOSN mantido como Texto (pode iniciar com zero, ex: "0102"), mesmo o
+    // manual descrevendo o campo como "Geral" — ver PENDENTE item 4 abaixo
+    // (a coluna "Código tributário" citada nas regras de CSOSN/Origem não
+    // existe no modelo; confirmar com o time antes de mudar este comportamento).
     leadingZeroColumns: ['CEST', 'NCM', 'CSOSN'],
     unitColumn: 'Unidade',
+    charLimits: {
+      'Código':               11,
+      'Código de barras':     300,
+      'Descrição do produto': 60,
+      'Referência':           120,
+      'Marca':                80,
+      'Grupo':                50,
+      'NCM':                  8,
+      'CEST':                 7,
+      'Unidade':              3,
+      'Observação':           300,
+    },
     columnAliases: {
       'Código':               ['Cod', 'Cod.', 'codigo', 'Codigo', 'ID'],
+      'Código de barras':     ['Codigo de Barras', 'Cod Barras', 'Cod. Barras', 'EAN', 'CodBarras', 'codigo_barras'],
       'Descrição do produto': ['Descrição', 'Descricao', 'Desc', 'Produto', 'Nome'],
+      'Referência':           ['Referencia', 'Ref', 'Ref.'],
+      'Marca':                ['marca'],
       'CEST':                 ['cest', 'Cest'],
       'NCM':                  ['ncm', 'Ncm', 'Codigo NCM', 'Cod NCM'],
       'CSOSN':                ['csosn', 'Csosn', 'CRT', 'crt'],
+      'Origem':               ['origem', 'Origem Mercadoria', 'Cod Origem'],
       'Qtd. Estoque':         ['Qtd Estoque', 'Quantidade', 'Estoque', 'Qtd'],
       'Preço Custo':          ['Preco Custo', 'Custo', 'preco_custo'],
       'Preço Venda':          ['Preco Venda', 'Venda', 'preco_venda'],
@@ -126,7 +162,8 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Unidade':              ['Unid', 'unidade', 'Un', 'UN', 'UND', 'und'],
       'Ativo':                ['ativo', 'Status'],
       'Balança':              ['Balanca', 'balanca'],
-      'Grupo tributário':      ['Código Grupo Tributário', 'Tributação', 'grupo tributario', 'grupo tributário'],
+      'Grupo':                ['grupo', 'Grupo Produto', 'Grupo de Produto'],
+      'Grupo Tributário':     ['Código Grupo', 'Código Grupo Tributário', 'Tributação', 'grupo tributario', 'grupo tributário'],
       'Balança Checkout':     ['Balanca Checkout', 'BalancaCheckout', 'Checkout'],
     },
   },
@@ -135,23 +172,44 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     label: 'Produtos de Grade',
     skipRows: 0,
     requiredColumns: ['ProdutoId', 'EmpresaId'],
+    // NOTA: "Coluna" (obrigatória se TipoColuna preenchido) e "Linha" (obrigatória
+    // se TipoLinha preenchido) são condicionais no manual. O validador ainda não
+    // tem um mecanismo de "obrigatório condicional" fora do bloco de endereço de
+    // Clientes/Fornecedores — precisa de ajuste em validateFile.ts para checar
+    // essa dependência linha a linha. Por ora os campos foram adicionados como
+    // opcionais (a checagem condicional fica pendente de implementação).
     cellRules: {
-      'ProdutoId':  'numbers',
-      'EmpresaId':  'numbers',
-      'Qtd':        'stock',
-      'QtdMin':     'stock',
-      'Estoque':    'stock',
-      'PrecoCusto': 'currency',
-      'Custo':      'currency',
-      'Preco':      'currency',
-      'PrecoVenda': 'currency',
-      'Margem':     'currency',
-      'Desconto':   'currency',
+      'ProdutoId':   'numbers',
+      'EmpresaId':   'numbers',
+      'Coluna':      'text',
+      'TipoColuna':  'text',
+      'Linha':       'text',
+      'TipoLinha':   'text',
+      // NOVO — mesma regra de Produto Simples: até 13 caracteres por código,
+      // vários separados por vírgula.
+      'CodBarras':   'text',
+      'Qtd':         'stock',
+      'QtdMin':      'stock',
+      'Estoque':     'stock',
+      'PrecoCusto':  'currency',
+      'Custo':       'currency',
+      'Preco':       'currency',
+      'PrecoVenda':  'currency',
+      'Margem':      'currency',
+      'Desconto':    'currency',
     },
     unitColumn: 'Unidade',
+    charLimits: {
+      'Coluna':     50,
+      'TipoColuna': 50,
+      'Linha':      50,
+      'TipoLinha':  50,
+      'CodBarras':  300,
+    },
     columnAliases: {
       'ProdutoId':  ['Produto Id', 'produto_id', 'ID Produto', 'Codigo Produto', 'CodigoProduto'],
       'EmpresaId':  ['Empresa Id', 'empresa_id', 'ID Empresa', 'Codigo Empresa', 'CodigoEmpresa'],
+      'CodBarras':  ['Codigo de Barras', 'Cod Barras', 'Cod. Barras', 'EAN', 'Código de barras'],
       'Qtd':        ['Quantidade', 'Qtd.', 'qtd', 'Qtd Estoque', 'QTD'],
       'QtdMin':     ['Qtd Min', 'Qtd. Min', 'Qtd Minima', 'Estoque Minimo', 'EstoqueMin'],
       'Estoque':    ['Saldo Estoque', 'Saldo', 'Estoque Atual'],
@@ -169,6 +227,10 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
     label: 'Contas a Pagar',
     skipRows: 0,
     requiredColumns: ['Código da Pessoa', 'Código da Empresa', 'Valor'],
+    // PENDENTE (manual, item 6): o modelo cita limite de 2 caracteres para
+    // "Código da Pessoa" em Contas a Pagar, diferente de todas as outras
+    // planilhas (9 ou 11 caracteres). Muito provavelmente um erro do modelo —
+    // NÃO foi aplicado limite de caracteres aqui até confirmação.
     requiredValueColumns: ['Código da Pessoa', 'Código da Empresa'],
     cellRules: {
       'Código da Pessoa':   'numbers',
@@ -182,6 +244,12 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Data da Emissão':    'date',
       'Data de Vencimento': 'date',
     },
+    // NOVO — limites de caracteres para os campos de texto livre citados no manual.
+    charLimits: {
+      'Descrição': 80,
+      'Categoria': 80,
+      'Documento': 80,
+    },
     columnAliases: {
       'Código da Pessoa':   ['Pessoa', 'Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
       'Código da Empresa':  ['Empresa', 'Emp', 'Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
@@ -190,6 +258,9 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Juros':              ['Juros (%)', 'Taxa Juros', 'Juro'],
       'Multa':              ['Multa (%)', 'Taxa Multa'],
       'Desconto':           ['Desc', 'Desconto (%)'],
+      'Descrição':          ['Descricao', 'Desc.'],
+      'Categoria':          ['categoria', 'Categoria Financeira'],
+      'Documento':          ['Doc', 'Doc.', 'Nº Documento', 'Numero Documento'],
       'Data da Emissão':    ['Dt Emissão', 'Emissão', 'Data Emissao'],
       'Data de Vencimento': ['Dt Vencimento', 'Vencimento', 'Dt Venc'],
     },
@@ -206,25 +277,45 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       // Contas a Receber → PONTO como separador decimal (currency_dot)
       'Valor em Aberto':   'currency_dot',
       'Valor Quitado':     'currency_dot',
-      'Carência':          'numbers',
+      // ATUALIZADO — o manual separa "Carência Multa (dias)" e "Carência Juros
+      // (dias)" como campos distintos (antes havia apenas um campo "Carência").
+      'Carência Multa':    'numbers',
+      'Carência Juros':    'numbers',
       'Juros':             'juros',
       'Multa':             'juros',
       'Desconto':          'currency_dot',
       'Data de Emissão':   'date',
+      'Data de Vencimento':'date',
       'Vencimento':        'date',
       'Recebimento':       'date',
+      // NOVO — campos citados no manual e ausentes do validador.
+      'Nome de Cliente':   'text',
+      'CPF/CNPJ':          'text',
+    },
+    // "Atenção aos documentos iniciados em zero" no manual → precisa de Texto.
+    leadingZeroColumns: ['CPF/CNPJ'],
+    charLimits: {
+      'Descrição':       80,
+      'Observação':      300,
+      'Documento':       50,
+      'Nome de Cliente': 60,
     },
     columnAliases: {
       'Código da Pessoa':  ['Cod Pessoa', 'CodPessoa', 'ID Pessoa', 'PessoaId', 'Pessoa Id', 'pessoa_id', 'CodigoPessoa', 'Codigo Pessoa'],
       'Código da Empresa': ['Cod Empresa', 'CodEmpresa', 'ID Empresa', 'EmpresaId', 'Empresa Id', 'empresa_id', 'CodigoEmpresa', 'Codigo Empresa'],
       'Valor em Aberto':   ['Vl Aberto', 'Saldo', 'Valor Aberto'],
       'Valor Quitado':     ['Vl Quitado', 'Quitado', 'Valor Pago'],
-      'Carência':          ['Carencia', 'Dias Carência', 'Dias Carencia'],
+      'Carência Multa':    ['Carência Multa (dias)', 'Carencia Multa', 'Dias Carência Multa'],
+      'Carência Juros':    ['Carência Juros (dias)', 'Carencia Juros', 'Dias Carência Juros'],
       'Juros':             ['Juros (%)', 'Taxa Juros', 'Juro'],
       'Multa':             ['Multa (%)', 'Taxa Multa'],
       'Desconto':          ['Desc', 'Desconto (%)'],
+      'Descrição':         ['Descricao', 'Desc.'],
+      'Documento':         ['Doc', 'Doc.', 'Nº Documento'],
+      'Nome de Cliente':   ['Nome Cliente', 'Cliente'],
+      'CPF/CNPJ':          ['CNPJ', 'CPF', 'CPF / CNPJ', 'cpf/cnpj'],
       'Data de Emissão':   ['Dt Emissão', 'Emissão', 'Data Emissao'],
-      'Vencimento':        ['Dt Vencimento', 'Data Vencimento', 'Dt Venc'],
+      'Data de Vencimento':['Dt Vencimento', 'Vencimento', 'Dt Venc'],
       'Recebimento':       ['Dt Recebimento', 'Data Recebimento', 'Dt Rec'],
     },
   },
@@ -244,13 +335,13 @@ export const VALIDATORS: Record<CellRule, {
       const num = Number(trimmed);
       return Number.isFinite(num) && Number.isInteger(num) && num >= 0;
     },
-    label: 'Apenas Números Inteiros',
+    label: 'Valor inválido — esta coluna aceita apenas números inteiros positivos (sem letras, símbolos ou casas decimais)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral"',
   },
 
   date: {
     test: (val: string) => /^\d{4}-\d{2}-\d{2}$/.test(val.trim()),
-    label: 'Data (AAAA-MM-DD)',
+    label: 'Data em formato inválido — use o padrão AAAA-MM-DD (ex: 2024-12-31)',
     numberAsTextLabel: '',
   },
 
@@ -260,7 +351,7 @@ export const VALIDATORS: Record<CellRule, {
       const trimmed = val.trim();
       return /^\d+([,.]?\d+)?$/.test(trimmed);
     },
-    label: 'Moeda com vírgula decimal (ex: 1250,99) — sem R$',
+    label: 'Valor de moeda inválido — use vírgula como separador decimal e não inclua "R$" (ex: 1250,99)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda" (decimais com vírgula)',
   },
 
@@ -270,13 +361,13 @@ export const VALIDATORS: Record<CellRule, {
       const trimmed = val.trim();
       return /^\d+([.]?\d+)?$/.test(trimmed);
     },
-    label: 'Moeda com ponto decimal (ex: 1250.99) — sem R$',
+    label: 'Valor de moeda inválido — use ponto como separador decimal e não inclua "R$" (ex: 1250.99)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Moeda" (decimais com ponto)',
   },
 
   binary: {
     test: (val: string) => /^[01]$/.test(val.trim()),
-    label: 'Binário (0 ou 1)',
+    label: 'Valor inválido — esta coluna só aceita 0 (Não) ou 1 (Sim)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (apenas 0 ou 1)',
   },
 
@@ -291,7 +382,7 @@ export const VALIDATORS: Record<CellRule, {
       if (decPart.length > 2) return false;
       return true;
     },
-    label: 'Juros/Multa — até 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50). Formato: Geral',
+    label: 'Valor inválido — juros/multa deve ter no máximo 3 dígitos inteiros e 2 decimais com vírgula (ex: 10,50), formato Geral',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Geral" (ex: 10,50)',
   },
 
@@ -299,15 +390,18 @@ export const VALIDATORS: Record<CellRule, {
     test: (val: string) => {
       const trimmed = val.trim();
       const num = Number(trimmed);
-      return Number.isFinite(num) && Number.isInteger(num);
+      // A exigência de número inteiro é condicional à Unidade da linha ("Unidade"/UN)
+      // e é aplicada em validateColumn (validateFile.ts), que tem acesso à coluna
+      // de Unidade. Aqui, fora desse contexto, apenas valida que é um número finito.
+      return Number.isFinite(num);
     },
-    label: 'Quantidade (inteiro, pode ser negativo)',
+    label: 'Valor inválido — esta coluna aceita apenas números (quantidade em estoque)',
     numberAsTextLabel: 'Número armazenado como texto — converta para Número e aplique o formato "Número" (inteiros, pode ser negativo)',
   },
 
   text: {
     test: (val: string) => val.trim().length > 0,
-    label: 'Texto (formato Texto no Excel — preserva zeros à esquerda)',
+    label: 'Valor inválido — este campo não pode ficar vazio e deve estar formatado como Texto no Excel (preserva zeros à esquerda)',
     numberAsTextLabel: '',
   },
 };

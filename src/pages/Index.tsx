@@ -6,7 +6,8 @@ import FileDropZone from '@/components/FileDropZone';
 import ErrorDashboard from '@/components/ErrorDashboard';
 import { FILE_TYPES } from '@/lib/validationRules';
 import { parseFile, validateWorkbook, type ValidationResult } from '@/lib/validateFile';
-import { Loader2, Upload, LayoutDashboard, CheckCircle2, BookOpen } from 'lucide-react';
+import { Loader2, Upload, LayoutDashboard, CheckCircle2, BookOpen, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import confetti from 'canvas-confetti';
 import logoVelo from '@/assets/logo-velo.png';
 import GuideDrawer from '@/components/GuideDrawer';
@@ -24,6 +25,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('upload');
   const [fileName, setFileName] = useState('');
   const [guideOpen, setGuideOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const handleFileSelect = async (file: File) => {
     if (!fileType) return;
@@ -54,6 +56,7 @@ const Index = () => {
         columnErrors: [{ column: '(Erro ao ler o ficheiro. Verifica se o formato é válido.)' }],
         cellErrors: [],
         rowCount: 0,
+        ghostRowCount: 0,
       });
       setActiveTab('dashboard');
     } finally {
@@ -68,24 +71,37 @@ const Index = () => {
   return (
     <>
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">
 
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <img src={logoVelo} alt="Velo" className="h-10 sm:h-12" />
-          <button
-            onClick={() => setGuideOpen(true)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card text-sm font-semibold text-foreground shadow-soft hover:bg-muted/50 transition-colors"
-          >
-            <BookOpen className="h-4 w-4" />
-            Guia Rápido
-          </button>
-          <button
-            onClick={() => setGuideOpen(true)}
-            className="flex sm:hidden items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground shadow-soft"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Guia
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label="Alternar modo escuro"
+              title="Alternar modo escuro"
+              className="h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl border border-border bg-card shadow-soft hover:bg-muted/50 transition-colors"
+            >
+              {theme === 'dark'
+                ? <Sun className="h-4 w-4 text-foreground" />
+                : <Moon className="h-4 w-4 text-foreground" />
+              }
+            </button>
+            <button
+              onClick={() => setGuideOpen(true)}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card text-sm font-semibold text-foreground shadow-soft hover:bg-muted/50 transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              Guia Rápido
+            </button>
+            <button
+              onClick={() => setGuideOpen(true)}
+              className="flex sm:hidden items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground shadow-soft"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Guia
+            </button>
+          </div>
         </div>
 
         <div className="text-center mb-6 sm:mb-8">
@@ -102,7 +118,8 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="dashboard" className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm rounded-lg relative data-[state=active]:bg-card data-[state=active]:shadow-soft">
                 <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Dashboard de Erros</TabsTrigger>
+                Dashboard de Erros
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="mt-0">
@@ -130,7 +147,7 @@ const Index = () => {
 
                 {loading && (
                   <div className="flex items-center justify-center gap-3 py-6">
-                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'hsl(270 60% 38%)' }} />
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     <span className="text-muted-foreground text-sm font-medium">A validar o ficheiro...</span>
                   </div>
                 )}
