@@ -14,6 +14,7 @@ import {
   REQUIRED_VALUE_LABEL,
   INVALID_CHAR_LABEL,
   INVISIBLE_CHAR_LABEL,
+  SUPPLIER_TYPE_LABEL,
 } from '@/lib/validateFile';
 
 interface Props {
@@ -60,20 +61,20 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
 
   lines.push('Olá! 😊');
   lines.push('');
-  lines.push(`Planilha *${fileName}* (${fileTypeLabel}) — encontramos os seguintes pontos para corrigir:`);
+  lines.push(`Planilha *${fileName}* (${fileTypeLabel}) — encontramos estes pontos para corrigir:`);
   lines.push('');
 
   const instrError = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
   if (instrError) {
-    lines.push('⚠️ *Linha de instruções detectada*');
-    lines.push('A linha 2 parece conter textos de orientação, não dados reais. Por favor, apague essa linha inteira antes de importar.');
+    lines.push('⚠️ *Linha de instruções na linha 2*');
+    lines.push('Apague essa linha inteira antes de importar.');
     lines.push('');
   }
 
   if (result.columnErrors.length > 0) {
-    lines.push('📋 *Colunas obrigatórias em falta*');
+    lines.push('📋 *Faltam colunas obrigatórias*');
     result.columnErrors.forEach(e => lines.push(`  • ${e.column}`));
-    lines.push('Por favor, adicione essas colunas e preencha os dados correspondentes.');
+    lines.push('Adicione essas colunas com os dados preenchidos.');
     lines.push('');
   }
 
@@ -84,113 +85,89 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
     if (ruleLabel.startsWith(NUMBER_AS_TEXT_PREFIX)) {
       const fmt  = finalFormatLabel(rule);
       const path = finalFormatPath(rule);
-      lines.push('🔢 *Número armazenado como texto*');
+      lines.push('🔢 *Número como texto*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Os valores estão salvos como texto no Excel (triângulo verde no canto da célula). Para corrigir:');
-      lines.push('  1. Selecione a(s) coluna(s) indicada(s)');
-      lines.push('  2. Clique no ícone ⚠️ que aparece à esquerda');
-      lines.push('  3. Escolha *"Converter para Número"*');
-      lines.push(`  4. Com a coluna ainda selecionada, vá em *${path}* e aplique o formato *"${fmt}"*`);
+      lines.push('  1. Selecione a(s) coluna(s)');
+      lines.push('  2. Clique no ⚠️ à esquerda → *"Converter para Número"*');
+      lines.push(`  3. Vá em *${path}* e aplique *"${fmt}"*`);
       lines.push('');
 
     } else if (ruleLabel === LEADING_ZERO_LABEL) {
-      lines.push('🔤 *Zeros à esquerda em risco — formate como Texto*');
+      lines.push('🔤 *Risco de perder zeros à esquerda*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Essa(s) coluna(s) está(ão) formatada(s) como número no Excel, o que remove automaticamente os zeros à esquerda (ex: CPF "04652781407" vira "4652781407"). Para corrigir:');
       lines.push('  1. Selecione a(s) coluna(s)');
       lines.push('  2. Vá em *Página Inicial → Número → Texto*');
-      lines.push('  3. Redigite os valores com todos os dígitos, incluindo os zeros à esquerda');
-      lines.push('  ⚠️ O formato Texto deve ser aplicado *antes* de digitar os valores.');
+      lines.push('  3. Redigite os valores com os zeros (ex: CPF 04652781407)');
       lines.push('');
 
-    } else if (ruleLabel === DATE_AS_SERIAL_LABEL) {
-      lines.push('📅 *Data em formato de data do Excel*');
+    } else if (ruleLabel === DATE_AS_SERIAL_LABEL || ruleLabel === DATE_WRONG_FORMAT_LABEL) {
+      lines.push('📅 *Data em formato errado*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('As datas precisam estar no formato *AAAA-MM-DD* (ex: 2024-12-31). Para corrigir:');
+      lines.push('Precisa estar como *AAAA-MM-DD* (ex: 2024-12-31).');
       lines.push('  1. Selecione a(s) coluna(s)');
-      lines.push('  2. Vá em *Página Inicial → Mais Formatos de Número*');
-      lines.push('  3. Em "Número → Data", mude a localidade para *Inglês (Estados Unidos)*');
-      lines.push('  4. Escolha o formato *YYYY-MM-DD* e clique OK');
-      lines.push('');
-
-    } else if (ruleLabel === DATE_WRONG_FORMAT_LABEL) {
-      lines.push('📅 *Formato de data incorreto*');
-      lines.push(`Coluna(s): ${colList}`);
-      lines.push('As datas estão num formato inválido (ex: 31/12/2024). O padrão exigido é *AAAA-MM-DD* (ex: 2024-12-31). Corrija seguindo os mesmos passos acima.');
+      lines.push('  2. Página Inicial → Mais Formatos de Número → Data');
+      lines.push('  3. Localidade: *Inglês (Estados Unidos)* → formato *YYYY-MM-DD*');
       lines.push('');
 
     } else if (rule === 'juros') {
-      lines.push('📊 *Formato de Juros/Multa incorreto*');
+      lines.push('📊 *Juros/Multa em formato errado*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Os valores devem ter no máximo 3 dígitos inteiros e 2 casas decimais separadas por *vírgula* (ex: 10,50). A célula deve estar no formato *Geral* no Excel.');
+      lines.push('Máximo 3 dígitos inteiros + 2 decimais com *vírgula* (ex: 10,50), célula no formato *Geral*.');
       lines.push('');
 
     } else if (rule === 'currency_dot') {
-      lines.push('💰 *Formato de valor incorreto — Contas a Receber*');
+      lines.push('💰 *Valor em formato errado (Contas a Receber)*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Nesta planilha, os valores devem usar *ponto* como separador decimal (ex: 1250.99). Não use vírgula nem o símbolo "R$".');
-      lines.push('Aplique o formato *Moeda* no Excel: *Página Inicial → Número → Moeda*.');
+      lines.push('Use *ponto* como decimal (ex: 1250.99), sem "R$". Formato: *Página Inicial → Número → Moeda*.');
       lines.push('');
 
     } else if (rule === 'currency') {
-      lines.push('💰 *Formato de valor incorreto*');
+      lines.push('💰 *Valor em formato errado*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Os valores devem usar *vírgula* como separador decimal (ex: 1250,99). Não use o símbolo "R$".');
-      lines.push('Aplique o formato *Moeda* no Excel: *Página Inicial → Número → Moeda*.');
+      lines.push('Use *vírgula* como decimal (ex: 1250,99), sem "R$". Formato: *Página Inicial → Número → Moeda*.');
       lines.push('');
 
-    } else if (ruleLabel === INVALID_CHAR_LABEL) {
-      lines.push('🔡 *Caractere inválido encontrado*');
+    } else if (ruleLabel === INVALID_CHAR_LABEL || ruleLabel === INVISIBLE_CHAR_LABEL) {
+      lines.push('👻 *Caractere inválido/invisível*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Existem caracteres não permitidos pelo sistema (ex: aspas tipográficas "  ", travessão —, símbolo ©). Para corrigir:');
-      lines.push('  1. Localize as linhas indicadas no relatório');
-      lines.push('  2. Substitua os caracteres especiais pelas versões simples (ex: aspas retas " ", hífen -)');
-      lines.push('  ⚠️ Evite copiar texto diretamente do Word ou de páginas web, pois eles inserem esses caracteres automaticamente.');
-      lines.push('');
-
-    } else if (ruleLabel === INVISIBLE_CHAR_LABEL) {
-      lines.push('👻 *Caractere invisível encontrado*');
-      lines.push(`Coluna(s): ${colList}`);
-      lines.push('Existem caracteres invisíveis nas células (ex: espaço não-separável, zero-width space). Eles não aparecem na tela mas causam erros na importação. Para corrigir:');
-      lines.push('  1. Localize as linhas indicadas no relatório');
-      lines.push('  2. Clique na célula, selecione todo o conteúdo (Ctrl+A) e redigite o valor manualmente');
-      lines.push('  ⚠️ Esses caracteres costumam vir de cópias de sites, PDFs ou sistemas externos.');
+      lines.push('  1. Clique na célula indicada');
+      lines.push('  2. Selecione tudo (Ctrl+A) e redigite o valor manualmente');
       lines.push('');
 
     } else if (ruleLabel === REQUIRED_VALUE_LABEL) {
       lines.push('🔴 *Campo obrigatório vazio*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push('Existem linhas sem preenchimento nessa(s) coluna(s) obrigatória(s). Por favor, preencha todos os campos.');
+      lines.push('Preencha todas as linhas dessa(s) coluna(s).');
+      lines.push('');
+
+    } else if (ruleLabel === SUPPLIER_TYPE_LABEL) {
+      lines.push('📦 *Tipo de fornecedor obrigatório*');
+      lines.push(`Linhas com Fornecedor = 1 e tipo não marcado: ${colList}`);
+      lines.push('Preencha os três: *Forn. Produto*, *Forn. Serviço* e *Forn. Transporte* (0 ou 1).');
       lines.push('');
 
     } else if (ruleLabel.toLowerCase().includes('morada')) {
-      lines.push('🏠 *REGRA DE ENDEREÇO — ATENÇÃO*');
-      lines.push('');
-      lines.push('Não é permitido preencher apenas alguns campos de endereço.');
-      lines.push('⚠️ *Atenção:* endereço incompleto faz o Velo salvar os dados como Observação em vez de endereço.');
-      lines.push('');
-      lines.push('👉 *CEP* | *LOGRADOURO* | *NÚMERO* | *COMPLEMENTO* | *BAIRRO* | *REFERÊNCIA* | *CIDADE* | *ESTADO*');
-      lines.push('');
-      lines.push(`Nas linhas com erro (campo(s) vazio(s): ${colList}), preencha *todos* os campos acima ou deixe *todos* em branco.`);
+      lines.push('🏠 *Endereço incompleto*');
+      lines.push(`Coluna(s): ${colList}`);
+      lines.push('Preencha *todos* os campos de endereço (CEP, Logradouro, Número, Complemento, Bairro, Referência, Cidade, Estado) ou deixe *todos* em branco.');
       lines.push('');
 
     } else if (ruleLabel.startsWith('Texto excede o limite de')) {
-      lines.push('📏 *Valor excede o tamanho do campo*');
+      lines.push('📏 *Texto muito longo*');
       lines.push(`Coluna(s): ${colList}`);
-      lines.push(`${ruleLabel}. Reduza o texto nas células indicadas.`);
+      lines.push(`${ruleLabel}.`);
       lines.push('');
 
     } else {
       const fmt = finalFormatLabel(rule);
       lines.push(`❌ *Valor inválido — ${fmt}*`);
       lines.push(`Coluna(s): ${colList}`);
-      lines.push(`Verifique os valores e aplique o formato correto: *${finalFormatPath(rule)}*.`);
+      lines.push(`Aplique o formato: *${finalFormatPath(rule)}* → *${fmt}*.`);
       lines.push('');
     }
   }
 
-  lines.push('Após realizar as correções, basta enviar a planilha novamente para validação. 🙏');
-  lines.push('Qualquer dúvida, estamos à disposição!');
+  lines.push('Depois de corrigir, envie a planilha novamente. 🙏');
 
   return lines.join('\n');
 }
@@ -243,9 +220,16 @@ export default function ClientMessageModal({ open, onClose, result, fileName, fi
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+                {/*
+                  FIX: o fundo estava fixo em um tom claro (hsl(220 20% 97%))
+                  enquanto o texto usava `text-foreground`, que no modo escuro
+                  vira quase branco — texto claro sobre fundo claro ficava
+                  praticamente ilegível. Agora o fundo usa `bg-muted`, que já
+                  se adapta ao tema, e o texto usa `text-foreground` (que
+                  contrasta corretamente com esse fundo nos dois modos).
+                */}
                 <pre
-                  className="whitespace-pre-wrap text-xs sm:text-sm text-foreground leading-relaxed font-sans rounded-xl p-4 border border-border"
-                  style={{ background: 'hsl(220 20% 97%)' }}
+                  className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed font-sans rounded-xl p-4 border border-border bg-muted text-foreground"
                 >
                   {message}
                 </pre>

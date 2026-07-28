@@ -51,6 +51,7 @@ export const FILE_TYPES: Record<string, FileTypeConfig> = {
       'Forn. Serviço':            'binary',
       'Forn. Transporte':         'binary',
     },
+    requiredValueColumns: ['Cliente', 'Fornecedor'],
     charLimits: {
       'Código':            11,
       'Nome/Razão Social': 60,

@@ -38,6 +38,7 @@ export const INVALID_CHAR_LABEL   = 'Caractere inválido encontrado — remova o
 export const INVISIBLE_CHAR_LABEL = 'Caractere invisível encontrado — pode causar falhas silenciosas na importação (ex: espaço não-separável, zero-width space, BOM)';
 export const FRACTIONAL_STOCK_UNIT_LABEL =
   'Quantidade em estoque fracionada — quando a Unidade informada nessa linha é "Unidade" (UN), o estoque não pode ter casas decimais (ex: 10, não 10,5)';
+export const SUPPLIER_TYPE_LABEL = 'Tipo de fornecedor obrigatório quando Fornecedor = 1';
 
 // ─── Whitelist de caracteres visíveis permitidos ──────────────────────────────
 const VISIBLE_ALLOWED_RE =
@@ -497,6 +498,32 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
       if (!err) { err = makeError(key, 'numbers', 'Morada obrigatória quando parcialmente preenchida', [], rows.length); cellErrors.push(err); }
       err.failCount++;
       err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName: addr.name });
+    }
+  }
+
+  // ── Fornecedor condicional (tipo de fornecedor obrigatório) ───────────────
+  // Regra específica de Clientes e Fornecedores: quando "Fornecedor" = 1,
+  // pelo menos um dos três tipos (Forn. Produto/Serviço/Transporte) passa a
+  // ser obrigatório naquela linha. Mesmo padrão do bloco de endereço acima:
+  // uma entrada de erro por coluna faltante, todas com o mesmo ruleLabel, para
+  // que o ClientMessageModal agrupe tudo corretamente.
+  const fornecedorIdx = colMap.get('Fornecedor');
+  const supplierTypeCols = ['Forn. Produto', 'Forn. Serviço', 'Forn. Transporte']
+    .map(c => ({ name: c, idx: colMap.get(c) ?? -1 }))
+    .filter(t => t.idx !== -1);
+
+  if (fornecedorIdx !== undefined && supplierTypeCols.length > 0) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][fornecedorIdx] ?? '').trim() !== '1') continue;
+
+      for (const t of supplierTypeCols) {
+        if (String(rows[i][t.idx] ?? '').trim()) continue;
+        const key = `${t.name} (tipo de fornecedor)`;
+        let err = cellErrors.find(e => e.column === key);
+        if (!err) { err = makeError(key, 'binary', SUPPLIER_TYPE_LABEL, [], rows.length); cellErrors.push(err); }
+        err.failCount++;
+        err.details.push({ row: i + 2 + config.skipRows, value: '(vazio)', colName: t.name });
+      }
     }
   }
 
