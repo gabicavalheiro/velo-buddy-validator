@@ -30,6 +30,12 @@ export const NUMBER_AS_TEXT_PREFIX   = 'Número armazenado como texto';
 export const DATE_AS_SERIAL_LABEL    = 'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 export const REQUIRED_VALUE_LABEL    = 'Campo obrigatório — esta coluna não pode ter linhas em branco';
 export const INSTRUCTION_ROW_LABEL   = 'A linha 2 parece conter instruções de preenchimento e não dados reais — apague essa linha antes de importar';
+export const GHOST_ROWS_LABEL_PREFIX = 'Linhas vazias "fantasma" detectadas no final da planilha';
+export const GHOST_ROWS_LABEL = (count: number) =>
+  `${GHOST_ROWS_LABEL_PREFIX} — ${count} linha${count > 1 ? 's' : ''} vazia${count > 1 ? 's' : ''}. ` +
+  'O Excel registra a planilha como tendo mais linhas do que dados reais (geralmente por formatação — cor, borda, formato de número — aplicada numa faixa vazia abaixo da última linha preenchida). ' +
+  'Selecione as linhas abaixo da última com dado real, clique com o botão direito e escolha "Excluir linhas" (não apenas "Limpar conteúdo"), depois salve — ' +
+  'alguns sistemas de importação leem a dimensão bruta do arquivo e processam essas linhas vazias mesmo assim.';
 export const LEADING_ZERO_LABEL      = 'Aviso: esta coluna está armazenada como Número no Excel. Isso só é um problema se algum valor começar com "0" — nesse caso, o zero à esquerda seria perdido (ex: CPF "04652781407" viraria "4652781407"). Se nenhum valor começa com zero, pode ignorar. Recomendado formatar como "Texto" para evitar o risco.';
 export const DATE_WRONG_FORMAT_LABEL = 'Data em formato incorreto — formate a coluna como Data no padrão AAAA-MM-DD (ex: 2024-12-31)';
 export const CHAR_LIMIT_LABEL        = (limit: number) => `Texto excede o limite de ${limit} caracteres permitidos`;
@@ -374,9 +380,20 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   // esse mesmo descarte.
   const ghostRowCount = rawRows.length - rows.length;
 
+  // Linhas fantasma bloqueiam a importação: alguns sistemas de importação
+  // leem a dimensão bruta do arquivo (não a última linha com dado real de
+  // fato) e processam essas linhas vazias mesmo assim.
+  const ghostRowError = (): CellError | null => ghostRowCount > 0
+    ? makeError('Linhas fantasma', 'numbers', GHOST_ROWS_LABEL(ghostRowCount),
+        [{ row: rows.length + 1 + config.skipRows, value: `${ghostRowCount} linha(s) vazia(s)` }], 1)
+    : null;
+
   const colMap   = resolveColumnIndices(headerRow, config);
   const instrErr = detectInstructionRow(rows);
-  if (instrErr) return { success: false, columnErrors: [], cellErrors: [instrErr], rowCount: rows.length - 1, ghostRowCount };
+  if (instrErr) {
+    const cellErrors = [instrErr, ghostRowError()].filter((e): e is CellError => e !== null);
+    return { success: false, columnErrors: [], cellErrors, rowCount: rows.length - 1, ghostRowCount };
+  }
 
   // Mapa reverso índice → nome canônico. Usado para que TODOS os tipos de erro
   // (cellRules, número-como-texto, caractere inválido/invisível, limite de
@@ -396,6 +413,8 @@ export function validateWorkbook(workbook: XLSX.WorkBook, config: FileTypeConfig
   const leadingZeroCols = new Set(config.leadingZeroColumns ?? []);
   const unitColIdx      = config.unitColumn ? colMap.get(config.unitColumn) : undefined;
   const cellErrors: CellError[] = [];
+  const ghErr = ghostRowError();
+  if (ghErr) cellErrors.push(ghErr);
 
   // ── Validação por cellRules ───────────────────────────────────────────────
   for (const [colName, rule] of Object.entries(config.cellRules)) {

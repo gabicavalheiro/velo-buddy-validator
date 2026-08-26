@@ -12,6 +12,7 @@ import {
   DATE_AS_SERIAL_LABEL,
   DATE_WRONG_FORMAT_LABEL,
   INSTRUCTION_ROW_LABEL,
+  GHOST_ROWS_LABEL_PREFIX,
   INVALID_CHAR_LABEL,
   INVISIBLE_CHAR_LABEL,
 } from '@/lib/validateFile';
@@ -253,9 +254,12 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
   if (!result) return null;
 
   // Erros de célula "relevantes" para exibição — exclui a detecção de linha de
-  // instruções e os erros de morada, que já têm banners próprios abaixo.
+  // instruções, as linhas fantasma e os erros de morada, que já têm banners
+  // próprios abaixo.
   const relevantCellErrors = result.cellErrors.filter(
-    e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada')
+    e => e.ruleLabel !== INSTRUCTION_ROW_LABEL
+      && !e.ruleLabel.startsWith(GHOST_ROWS_LABEL_PREFIX)
+      && !e.column.includes('morada')
   );
 
   // Separação por severidade: 'warning' é só um alerta informativo (ex: coluna
@@ -279,21 +283,21 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-xl p-4 flex gap-3 border"
-      style={{ background: 'hsl(210 80% 50% / 0.08)', borderColor: 'hsl(210 80% 50% / 0.3)' }}
+      style={{ background: 'hsl(var(--destructive) / 0.08)', borderColor: 'hsl(var(--destructive) / 0.3)' }}
     >
-      <Rows3 className="h-5 w-5 shrink-0 mt-0.5" style={{ color: 'hsl(210 80% 45%)' }} />
+      <Rows3 className="h-5 w-5 shrink-0 mt-0.5 text-destructive" />
       <div className="min-w-0">
         <p className="font-bold text-sm text-foreground">
-          {result.ghostRowCount} linha{result.ghostRowCount > 1 ? 's' : ''} vazia{result.ghostRowCount > 1 ? 's' : ''} "fantasma" no final da planilha (ignorada{result.ghostRowCount > 1 ? 's' : ''} na validação)
+          {result.ghostRowCount} linha{result.ghostRowCount > 1 ? 's' : ''} vazia{result.ghostRowCount > 1 ? 's' : ''} "fantasma" detectada{result.ghostRowCount > 1 ? 's' : ''} no final da planilha — bloqueia a importação
         </p>
         <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
           O Excel às vezes registra a planilha como tendo mais linhas do que os dados reais — geralmente por formatação
           (cor, borda, formato de número) aplicada numa faixa vazia abaixo da última linha preenchida.
         </p>
         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-          <strong className="text-foreground">Para corrigir na origem:</strong> selecione as linhas abaixo da última com dado real,
+          <strong className="text-foreground">Para corrigir:</strong> selecione as linhas abaixo da última com dado real,
           clique com o botão direito e escolha <strong className="text-foreground">"Excluir linhas"</strong> (não apenas "Limpar conteúdo"),
-          depois salve. Alguns sistemas de importação leem a dimensão bruta do arquivo e podem processar essas linhas vazias mesmo assim.
+          depois salve. Alguns sistemas de importação leem a dimensão bruta do arquivo e processam essas linhas vazias mesmo assim.
         </p>
       </div>
     </motion.div>

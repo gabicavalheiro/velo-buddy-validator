@@ -11,6 +11,7 @@ import {
   DATE_AS_SERIAL_LABEL,
   DATE_WRONG_FORMAT_LABEL,
   INSTRUCTION_ROW_LABEL,
+  GHOST_ROWS_LABEL_PREFIX,
   REQUIRED_VALUE_LABEL,
   INVALID_CHAR_LABEL,
   INVISIBLE_CHAR_LABEL,
@@ -49,6 +50,7 @@ function groupErrors(cellErrors: CellError[]): Map<string, { rule: CellRule; col
   const map = new Map<string, { rule: CellRule; cols: string[] }>();
   for (const e of cellErrors) {
     if (e.ruleLabel === INSTRUCTION_ROW_LABEL) continue;
+    if (e.ruleLabel.startsWith(GHOST_ROWS_LABEL_PREFIX)) continue;
     const key = `${e.ruleLabel}||${e.rule}`;
     if (!map.has(key)) map.set(key, { rule: e.rule, cols: [] });
     map.get(key)!.cols.push(e.column);
@@ -68,6 +70,16 @@ function buildMessage(result: ValidationResult, fileName: string, fileTypeLabel:
   if (instrError) {
     lines.push('⚠️ *Linha de instruções na linha 2*');
     lines.push('Apague essa linha inteira antes de importar.');
+    lines.push('');
+  }
+
+  const ghostRowError = result.cellErrors.find(e => e.ruleLabel.startsWith(GHOST_ROWS_LABEL_PREFIX));
+  if (ghostRowError) {
+    lines.push('👻 *Linhas vazias "fantasma" no final da planilha*');
+    lines.push(`O Excel registrou ${result.ghostRowCount} linha${result.ghostRowCount > 1 ? 's' : ''} a mais do que os dados reais (geralmente formatação aplicada numa faixa vazia).`);
+    lines.push('  1. Selecione as linhas abaixo da última com dado real');
+    lines.push('  2. Botão direito → *"Excluir linhas"* (não "Limpar conteúdo")');
+    lines.push('  3. Salve o arquivo');
     lines.push('');
   }
 

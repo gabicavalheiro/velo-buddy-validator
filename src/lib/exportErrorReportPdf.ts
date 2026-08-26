@@ -18,6 +18,7 @@ import {
   DATE_AS_SERIAL_LABEL,
   DATE_WRONG_FORMAT_LABEL,
   INSTRUCTION_ROW_LABEL,
+  GHOST_ROWS_LABEL_PREFIX,
   REQUIRED_VALUE_LABEL,
   INVALID_CHAR_LABEL,
   INVISIBLE_CHAR_LABEL,
@@ -169,14 +170,17 @@ export function exportErrorReportPdf(result: ValidationResult, fileName: string,
   // Mesmos filtros/agrupamentos usados no ErrorDashboard, para o relatório
   // bater exatamente com o que aparece na tela.
   const relevantCellErrors = result.cellErrors.filter(
-    e => e.ruleLabel !== INSTRUCTION_ROW_LABEL && !e.column.includes('morada'),
+    e => e.ruleLabel !== INSTRUCTION_ROW_LABEL
+      && !e.ruleLabel.startsWith(GHOST_ROWS_LABEL_PREFIX)
+      && !e.column.includes('morada'),
   );
   const blockingCellErrors = relevantCellErrors.filter(e => e.severity !== 'warning');
   const warningCellErrors  = relevantCellErrors.filter(e => e.severity === 'warning');
   const totalBlockingCellErrors = blockingCellErrors.reduce((sum, e) => sum + e.failCount, 0);
   const totalWarnings           = warningCellErrors.reduce((sum, e) => sum + e.failCount, 0);
-  const moradaErrors = result.cellErrors.filter(e => e.column.includes('morada'));
-  const instrError   = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+  const moradaErrors  = result.cellErrors.filter(e => e.column.includes('morada'));
+  const instrError    = result.cellErrors.find(e => e.ruleLabel === INSTRUCTION_ROW_LABEL);
+  const ghostRowError = result.cellErrors.find(e => e.ruleLabel.startsWith(GHOST_ROWS_LABEL_PREFIX));
 
   // ── Resumo ──────────────────────────────────────────────────────────────────
   autoTable(doc, {
@@ -204,6 +208,20 @@ export function exportErrorReportPdf(result: ValidationResult, fileName: string,
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
     const txt = doc.splitTextToSize(
       'A linha 2 parece conter textos de orientação de preenchimento, não dados reais. Apague essa linha inteira antes de importar.',
+      pageWidth - MARGIN * 2,
+    );
+    doc.text(txt, MARGIN, y); y += txt.length * 12 + 10;
+  }
+
+  // ── Linhas fantasma ───────────────────────────────────────────────────────────
+  if (ghostRowError) {
+    y = ensureSpace(doc, y, 50);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text(`${result.ghostRowCount} linha${result.ghostRowCount > 1 ? 's' : ''} fantasma detectada${result.ghostRowCount > 1 ? 's' : ''} — bloqueia a importação`, MARGIN, y); y += 14;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    const txt = doc.splitTextToSize(
+      'O Excel registra a planilha como tendo mais linhas do que dados reais (geralmente por formatação aplicada numa faixa vazia). ' +
+      'Selecione as linhas abaixo da última com dado real, botão direito > "Excluir linhas" (não "Limpar conteúdo"), e salve.',
       pageWidth - MARGIN * 2,
     );
     doc.text(txt, MARGIN, y); y += txt.length * 12 + 10;

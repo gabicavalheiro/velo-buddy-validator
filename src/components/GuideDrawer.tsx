@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Users, Package, Grid3X3, CreditCard, TrendingDown,
   AlertTriangle, CheckCircle2, Info, ChevronDown, ChevronUp, Lightbulb,
-  Eraser, Copy, Check,
+  Eraser, Copy, Check, Rows3,
 } from 'lucide-react';
 
 interface GuideItem {
@@ -104,6 +104,34 @@ const VBA_SUBSTITUIR_INVISIVEIS = `Sub SubstituirPorEspacosReais()
     Next ws
 
     MsgBox "Todos os caracteres invisíveis foram substituídos por espaços reais!"
+End Sub`;
+
+const VBA_REMOVER_LINHAS_FANTASMA = `Sub RemoverLinhasFantasma()
+    Dim ws As Worksheet
+    Dim ultimaLinhaReal As Long
+    Dim ultimaLinhaUsada As Long
+    Dim c As Long
+    Dim linhaCol As Long
+
+    Set ws = ActiveSheet
+
+    ' Percorre todas as colunas usadas para achar a última linha com dado real
+    ultimaLinhaReal = 1
+    For c = 1 To ws.UsedRange.Columns.Count
+        linhaCol = ws.Cells(ws.Rows.Count, c).End(xlUp).Row
+        If linhaCol > ultimaLinhaReal Then ultimaLinhaReal = linhaCol
+    Next c
+
+    ultimaLinhaUsada = ws.UsedRange.Rows.Count + ws.UsedRange.Row - 1
+
+    If ultimaLinhaUsada > ultimaLinhaReal Then
+        ws.Rows(ultimaLinhaReal + 1 & ":" & ultimaLinhaUsada).Delete
+        ThisWorkbook.Save
+        MsgBox "Removida(s) " & (ultimaLinhaUsada - ultimaLinhaReal) & " linha(s) fantasma." & vbCrLf & _
+               "Última linha com dado real: " & ultimaLinhaReal, vbInformation
+    Else
+        MsgBox "Nenhuma linha fantasma encontrada.", vbInformation
+    End If
 End Sub`;
 
 const SECTIONS: GuideSection[] = [
@@ -240,6 +268,34 @@ const SECTIONS: GuideSection[] = [
       {
         warning: true,
         text: 'Faça uma cópia de segurança da planilha antes de rodar o macro — a alteração é aplicada direto nas células e é salva junto com o arquivo.',
+      },
+    ],
+  },
+  {
+    id: 'linhasFantasma',
+    icon: <Rows3 className="h-4 w-4" />,
+    color: 'hsl(200 75% 40%)',
+    title: 'Linhas Vazias no Final (Fantasma)',
+    items: [
+      {
+        label: 'O que é',
+        text: 'O Excel às vezes registra a planilha como tendo mais linhas do que os dados reais — geralmente porque alguém aplicou formatação (cor, borda, formato de número) numa faixa vazia abaixo da última linha preenchida. Isso agora bloqueia a importação.',
+      },
+      {
+        label: 'Como corrigir manualmente',
+        text: 'Selecione as linhas abaixo da última com dado real → botão direito → "Excluir linhas" (não apenas "Limpar conteúdo") → salve o arquivo. "Limpar conteúdo" apaga os valores mas mantém a formatação, então o problema continua.',
+      },
+      {
+        label: 'Como rodar o macro',
+        text: 'No Excel: Alt+F11 (abre o editor VBA) → Inserir > Módulo → cole o código abaixo → feche o editor → Alt+F8 → escolha o macro → Executar. Ele encontra a última linha com dado real, exclui tudo abaixo e já salva o arquivo.',
+      },
+      {
+        codeLabel: 'Excluir linhas fantasma automaticamente',
+        code: VBA_REMOVER_LINHAS_FANTASMA,
+      },
+      {
+        warning: true,
+        text: 'Faça uma cópia de segurança da planilha antes de rodar o macro — ele exclui linhas e salva o arquivo automaticamente.',
       },
     ],
   },
