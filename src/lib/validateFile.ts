@@ -248,8 +248,13 @@ function detectInstructionRow(rows: unknown[][]): CellError | null {
 
   if (!cells.length) return null;
 
+  // Conta valores DISTINTOS acima de 40 caracteres — se a mesma string longa
+  // aparece repetida em duas colunas (ex: Razão Social == Fantasia), isso não
+  // é instrução, é dado real duplicado entre campos.
+  const longCells = new Set(cells.filter(v => v.length > 40));
+
   const isInstruction =
-    cells.filter(v => v.length > 40).length >= 2 ||
+    longCells.size >= 2 ||
     cells.some(v => INSTRUCTION_KEYWORDS.some(kw => v.toLowerCase().includes(kw)));
 
   if (!isInstruction) return null;

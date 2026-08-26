@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   XCircle, Columns3, Grid3X3, ChevronDown, ChevronUp,
-  Hash, HelpCircle, AlertOctagon, MessageSquare, EyeOff, Ban, Rows3,
+  Hash, HelpCircle, AlertOctagon, MessageSquare, EyeOff, Ban, Rows3, FileDown,
 } from 'lucide-react';
 import type { ValidationResult, CellError, CellErrorDetail } from '@/lib/validateFile';
 import {
@@ -18,6 +18,7 @@ import {
 import type { CellRule } from '@/lib/validationRules';
 import HelpModal from './Helpmodal.tsx';
 import ClientMessageModal from './ClientMessagemodal.tsx';
+import { exportErrorReportPdf } from '@/lib/exportErrorReportPdf.ts';
 
 interface Props {
   result: ValidationResult | null;
@@ -27,7 +28,7 @@ interface Props {
 
 // ─── Tipo agrupado ────────────────────────────────────────────────────────────
 
-interface GroupedCellError {
+export interface GroupedCellError {
   ruleLabel: string;
   rule: CellRule;
   columns: string[];
@@ -35,7 +36,7 @@ interface GroupedCellError {
   details: CellErrorDetail[];
 }
 
-function groupCellErrors(errors: CellError[]): GroupedCellError[] {
+export function groupCellErrors(errors: CellError[]): GroupedCellError[] {
   const map = new Map<string, GroupedCellError>();
 
   for (const e of errors) {
@@ -459,7 +460,7 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
 
       {warningsSection}
 
-      <div className="flex justify-center pt-2 pb-1">
+      <div className="flex flex-wrap justify-center gap-2 pt-2 pb-1">
         <button
           onClick={() => setMsgOpen(true)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
@@ -467,6 +468,13 @@ export default function ErrorDashboard({ result, fileName, fileTypeLabel }: Prop
         >
           <MessageSquare className="h-4 w-4" />
           Gerar mensagem para o cliente
+        </button>
+        <button
+          onClick={() => exportErrorReportPdf(result, fileName, fileTypeLabel)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-border text-foreground hover:bg-muted/40 transition-colors"
+        >
+          <FileDown className="h-4 w-4" />
+          Exportar relatório em PDF
         </button>
       </div>
 
